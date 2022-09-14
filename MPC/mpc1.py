@@ -28,7 +28,7 @@ bmin_morning = 0.40 * battery_size;
 bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
 
 
-##################################################################
+##################################################################2
 ################## IMPLEMENTATION OF THE PROBLEM ##################
 # Init problem
 prob = LpProblem("mpc1", LpMinimize)
