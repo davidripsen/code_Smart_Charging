@@ -1,14 +1,26 @@
 """
     Implementation of the economic MPC problem for multi-day Smart Charging of EVs.
+    The problem is solved using the PuLP package.
 """
-
 # Imports
 from re import X
 from pulp import *
 import numpy as np
 import plotly.graph_objects as go
+import pandas as pd
 
-##################### TEMPORARY SIMULATION OF VAR #################
+# Read prices
+df = pd.read_csv("../data/df_spot_month.csv")
+df['HourDK'] = pd.to_datetime(df['HourDK'])
+    # Convert Spot prices to DKK/kWh
+df['DKK'] = df['SpotPriceDKK']/1000
+df = df.drop(['PriceArea', 'SpotPriceEUR', 'SpotPriceDKK'], axis=1)
+    # Flip order of rows and reset index
+df = df.iloc[::-1].reset_index(drop=True)
+    # Subset the first three days of df
+dfsub = df.iloc[:72]
+
+############# SIMULATION OF DATA: EV behaviour and prices #################
 # Horizon
 T = 24*14
 tvec = np.arange(0,T+1)
@@ -156,12 +168,28 @@ prob = DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
 plot_EMPC(prob, tvec, 'DumbCharge')
 
 
+
+
+
 ######################################################
 ### 3. Implementation of day-ahead
 ######################################################
+def DayAhead(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
+    # Identify plug-ins: When z turns from 0 to 1
+    indx_plug_in = np.where(np.diff(z) == 1)[0]
+    #times_plug_in = df['HourDK'][indx_plug_in]
 
 
+    for i in indx_plug_in:
+        time_plug_in = df['HourDK'][i]
+        if time_plug_in.hour >= 15:  ### ASSUME day-ahead prices are available from 15.00 (SIMULATION)
+            avail_day_ahead = True
+        else:
+            avail_day_ahead = False
 
+        if avail_day_ahead:
+            # Sample timestamps from time_plug_in to time_plug_in + the whole next day
+            # MISSING: NÅET HERTIL :-)
 
 
 
@@ -171,20 +199,9 @@ plot_EMPC(prob, tvec, 'DumbCharge')
 
 
 ######################################################
-### 4. Read true spot prices
+### 4. Run models on real prices #####################
 ######################################################
-# Read data
-import pandas as pd
-df = pd.read_csv("../data/df_spot_month.csv")
-    # Convert Spot prices to DKK/kWh
-df['DKK'] = df['SpotPriceDKK']/1000
-df = df.drop(['PriceArea', 'SpotPriceEUR', 'SpotPriceDKK'], axis=1)
-    # Flip order of rows and reset index
-df = df.iloc[::-1].reset_index(drop=True)
 
-
-
-############# Run models on real prices #########################
 c = df['DKK'].to_numpy()
 T = len(c)-1
 tvec = np.arange(0,T+1)
