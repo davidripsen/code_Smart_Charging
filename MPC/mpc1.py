@@ -35,7 +35,7 @@ bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(pl
 ################## IMPLEMENTATION OF THE PROBLEM ##################
 ###################################################################
 
-def SmartCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
+def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
     # Init problem
     prob = LpProblem("mpc1", LpMinimize)
 
@@ -47,7 +47,7 @@ def SmartCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
     b[0] = b0
 
     # Objective
-    prob += lpSum([c[t]*x[t] for t in tvec] + c_tilde * b[T+1])
+    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * b[T+1])
 
     # Constraints
     for t in tvec:
@@ -64,7 +64,7 @@ def SmartCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
     return(prob)
 
 # Run the problem
-prob = SmartCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+prob = PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
 
 # Print results nicely
 print("Status:", LpStatus[prob.status])
@@ -78,7 +78,7 @@ prob.writeLP("MPC/lp-files/mpc1.lp")
 
 ######################################################
 ########### Visualise results using plotly ###########
-def plot_EMPC(prob, tvec, name=""):
+def plot_EMPC(prob, tvec, name="", timestamps="",export=False):
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=tvec, y=[value(b[t]) for t in tvec], mode='lines', name='State-of-Charge'))
     fig.add_trace(go.Scatter(x=tvec, y=[value(x[t]) for t in tvec], mode='lines', name='Charging'))
@@ -88,16 +88,18 @@ def plot_EMPC(prob, tvec, name=""):
     # add "Days" to x-axis
     # Add total cost to title
     fig.update_layout(
-        title=name + "    MPC for Smart Charging of EVs (SIMULATED DATA)       Total cost: " + str(value(prob.objective)) + "DKK",
+        title=name + "    MPC of EVs (simulated data)       Total cost: " + str(round(value(prob.objective))) + " DKK",
         xaxis_title="Days",
         yaxis_title="kWh or DKK/kWh",)
     fig.show()
 
-    ## Export interactive plotly figure
-    #fig.write_html("../../plots/MPC/mpc1.html")
+    ## Export figure
+    if export:
+        fig.write_html("../../plots/MPC/mpc1.html")
 
 # Plot results
 plot_EMPC(prob, tvec, 'SmartCharge')
+
 
 
 
@@ -114,19 +116,33 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
     global b
     x = LpVariable.dicts("x", tvec, lowBound=0, upBound=xmax, cat='Continuous')
     b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=bmax, cat='Continuous')
+    i = LpVariable.dicts("i", tvec, lowBound=0, upBound=1, cat='Binary')
     b[0] = b0
+    M = 10**6
 
     # Objective
-    prob += lpSum([c[t]*x[t] for t in tvec] + c_tilde * b[T+1])
+    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * b[T+1])
 
     # Constraints
     for t in tvec:
         prob += b[t+1] == b[t] + x[t] - u[t]
         prob += b[t+1] >= bmin[t+1]
         prob += b[t] <= bmax
-        prob += x[t] <= z[t]*xmax # INSTANT CHARGE CONSTRAINT
-        prob += x[t] <= bmax-b[t] # INSTANT CHARGE CONSTRAINT
-       
+        
+        ######## DUMB CHARGE ######## (MISSING: working)
+        ### Implement in OR-terms: x[t] == min(z[t]*xmax, bmax-b[t])
+        #######
+        # Ensure i[t] == 1, if z[t]*xmax < bmax-b[t] (dvs. i=1 når der er rigeligt plads på batteriet)
+        prob += bmax-b[t] - z[t]*xmax  - M*i[t] <= 0
+        prob += z[t]*xmax - bmax+b[t] - M*(1-i[t]) <= 0
+
+        # Use i[t] to constraint x[t]
+        prob += x[t] <= z[t]*xmax
+        prob += x[t] <= bmax-b[t]
+        prob += x[t] >= (z[t]*xmax - M*(1-i[t])) # i = 1 betyder, at der lades max kapacitet
+        prob += x[t] >= (bmax-b[t] - M*i[t])     # i = 0 betyder, at vi kun kan lade de resterende til 100 % SOC
+        #prob += i[t] <= z[t]
+
     # Solve problem
     prob.solve()
 
@@ -137,4 +153,54 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
 prob = DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
 
 # Plot results
-plot_EMPC(prob, tvec, 'DumbCharge') 
+plot_EMPC(prob, tvec, 'DumbCharge')
+
+
+######################################################
+### 3. Implementation of day-ahead
+######################################################
+
+
+
+
+
+
+
+
+
+
+
+######################################################
+### 4. Read true spot prices
+######################################################
+# Read data
+import pandas as pd
+df = pd.read_csv("../data/df_spot_month.csv")
+    # Convert Spot prices to DKK/kWh
+df['DKK'] = df['SpotPriceDKK']/1000
+df = df.drop(['PriceArea', 'SpotPriceEUR', 'SpotPriceDKK'], axis=1)
+    # Flip order of rows and reset index
+df = df.iloc[::-1].reset_index(drop=True)
+
+
+
+############# Run models on real prices #########################
+c = df['DKK'].to_numpy()
+T = len(c)-1
+tvec = np.arange(0,T+1)
+
+# External variables (SIMULATED)
+z = np.piecewise(tvec, [(((tvec % 24) >= np.ceil(plugin)) | ((tvec % 24) <= np.floor(plugout-0.01)))], [1,0]) # [0,1] plugged in at tc = 5.5 - z*np.random.uniform(-1,2,T+1) # cost of electricity at t
+c_tilde = min(c[-0:24]) # Value of remaining electricity: lowest el price the past 24h
+u = np.random.uniform(8,16,T+1) * (tvec % 24 == np.floor(plugin)-1)
+bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
+
+#######
+# Perfect Foresight
+prob = PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+plot_EMPC(prob, tvec, 'PerfectForesight')
+
+# Dumb Charge
+prob = DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+plot_EMPC(prob, tvec, 'DumbCharge')
+# Juhuu :-D Besparelse: ca. 66 % af prisen.
