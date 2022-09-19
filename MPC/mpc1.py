@@ -8,6 +8,7 @@ from pulp import *
 import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
+import datetime as dt
 
 # Read prices
 df = pd.read_csv("../data/df_spot_month.csv")
@@ -174,27 +175,61 @@ plot_EMPC(prob, tvec, 'DumbCharge')
 ######################################################
 ### 3. Implementation of day-ahead
 ######################################################
+
+
+
+c = dfsub['DKK'].to_numpy()
+T = len(c)-1
+tvec = np.arange(0,T+1)
+
+# External variables (SIMULATED)
+z = np.piecewise(tvec, [(((tvec % 24) >= np.ceil(plugin)) | ((tvec % 24) <= np.floor(plugout-0.01)))], [1,0]) # [0,1] plugged in at tc = 5.5 - z*np.random.uniform(-1,2,T+1) # cost of electricity at t
+c_tilde = min(c[-0:24]) # Value of remaining electricity: lowest el price the past 24h
+u = np.random.uniform(8,16,T+1) * (tvec % 24 == np.floor(plugin)-1)
+bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
+
 def DayAhead(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
     # Identify plug-ins: When z turns from 0 to 1
-    indx_plug_in = np.where(np.diff(z) == 1)[0]
+    indx_plug_ins = np.where(np.diff(z) == 1)[0]
     #times_plug_in = df['HourDK'][indx_plug_in]
-
-
-    for i in indx_plug_in:
-        time_plug_in = df['HourDK'][i]
+    for plug_in in indx_plug_ins:
+        time_plug_in = df['HourDK'][plug_in]
         if time_plug_in.hour >= 15:  ### ASSUME day-ahead prices are available from 15.00 (SIMULATION)
             avail_day_ahead = True
         else:
             avail_day_ahead = False
 
+        # Define available day-ahead prices
         if avail_day_ahead:
-            # Sample timestamps from time_plug_in to time_plug_in + the whole next day
-            # MISSING: NÅET HERTIL :-)
+            last_price_avail = time_plug_in + dt.timedelta(days=1)
+            last_price_avail = last_price_avail.replace(hour=23)    
+        else:
+            last_price_avail = time_plug_in.replace(hour=23)
 
+        flex_indx = (dfsub['HourDK'] >= time_plug_in) & (dfsub['HourDK'] <= last_price_avail).to_numpy()
+        c = dfsub['DKK'][flex_indx].to_numpy()
+        c_tilde = min(c)
+        T = len(c)-1
+        global tvec_flex
+        tvec_flex = np.arange(0,T+1)
 
+        # Find relevant input at the specific hours of flexibility
+        z_flex = z[flex_indx]
+        u_flex = u[flex_indx]
+        bmin_flex = np.piecewise(np.append(tvec_flex,T+1), [np.append(tvec_flex,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
+        b0 = b0 # MANGLER REKURSION
 
+        # For known day-ahead prices, this is a perfect foresight problem
+        prob = PerfectForesight(b0, bmax, bmin_flex, xmax, c, c_tilde, u_flex, z_flex, T, tvec_flex)
 
+        if plug_in == 17:
+            break;
+    # Mangler at BINDE LOOPS SAMMEN
+    return(prob)
 
+# Run the problem
+prob = DayAhead(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+plot_EMPC(prob, tvec_flex, 'PerfectForesight')
 
 
 
