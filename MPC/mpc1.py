@@ -3,7 +3,6 @@
     The problem is solved using the PuLP package.
 """
 # Imports
-from re import X
 from pulp import *
 import numpy as np
 import plotly.graph_objects as go
@@ -11,7 +10,7 @@ import pandas as pd
 import datetime as dt
 
 # Read prices
-df = pd.read_csv("../data/df_spot_month.csv")
+df = pd.read_csv("../data/df_spot_sept22.csv")
 df['HourDK'] = pd.to_datetime(df['HourDK'])
     # Convert Spot prices to DKK/kWh
 df['DKK'] = df['SpotPriceDKK']/1000
@@ -48,19 +47,17 @@ bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(pl
 ################## IMPLEMENTATION OF THE PROBLEM ##################
 ###################################################################
 
-def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
+def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, verbose=True):
     # Init problem
     prob = LpProblem("mpc1", LpMinimize)
 
     # Init variables
-    global x
-    global b
     x = LpVariable.dicts("x", tvec, lowBound=0, upBound=xmax, cat='Continuous')
     b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=bmax, cat='Continuous')
     b[0] = b0
 
     # Objective
-    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * b[T+1])
+    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * (b[T+1]))
 
     # Constraints
     for t in tvec:
@@ -71,13 +68,16 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
                 # Debugging tips: Du kan ikke constrainte en variabels startpunkt, når startpunktet har fået en startværdi.
 
     # Solve problem
-    prob.solve()
+    if verbose:
+        prob.solve()
+    else:
+       prob.solve(PULP_CBC_CMD(msg=0))
 
     # Return results
-    return(prob)
+    return(prob, x, b)
 
 # Run the problem
-prob = PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+prob, x, b = PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
 
 # Print results nicely
 print("Status:", LpStatus[prob.status])
@@ -89,29 +89,50 @@ for v in prob.variables():
 prob.writeLP("MPC/lp-files/mpc1.lp")
 
 
+
+
+
+
+
 ######################################################
 ########### Visualise results using plotly ###########
-def plot_EMPC(prob, tvec, name="", timestamps="",export=False):
+######################################################
+
+def plot_EMPC(prob, name="",export=False):
+    # Identify iterative-appended, self-made prob
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=tvec, y=[value(b[t]) for t in tvec], mode='lines', name='State-of-Charge'))
-    fig.add_trace(go.Scatter(x=tvec, y=[value(x[t]) for t in tvec], mode='lines', name='Charging'))
-    fig.add_trace(go.Scatter(x=tvec, y=[value(u[t]) for t in tvec], mode='lines', name='Use'))
-    fig.add_trace(go.Scatter(x=tvec, y=[value(c[t]) for t in tvec], mode='lines', name='Price'))
-    fig.update_xaxes(tickvals=tvec[::24], ticktext=[str(t//24) for t in tvec[::24]])
+    if type(prob) == dict:
+        tvec = np.arange(0, len(prob['x']))
+        tvec_b = np.arange(0, len(prob['b']))
+        fig.add_trace(go.Scatter(x=tvec_b, y=[value(prob['b'][t]) for t in tvec_b], mode='lines', name='State-of-Charge'))
+        fig.add_trace(go.Scatter(x=tvec, y=[value(prob['x'][t]) for t in tvec], mode='lines', name='Charging'))
+        fig.add_trace(go.Scatter(x=tvec, y=[value(prob['u'][t]) for t in tvec], mode='lines', name='Use'))
+        fig.add_trace(go.Scatter(x=tvec, y=[value(prob['c'][t]) for t in tvec], mode='lines', name='Price'))
+        obj = prob['objective']
+    else:
+        tvec = np.arange(0, len(x))
+        tvec_b = np.arange(0, len(b))
+        obj = value(prob.objective)
+        fig.add_trace(go.Scatter(x=tvec_b, y=[value(b[t]) for t in tvec_b], mode='lines', name='State-of-Charge'))
+        fig.add_trace(go.Scatter(x=tvec, y=[value(x[t]) for t in tvec], mode='lines', name='Charging'))
+        fig.add_trace(go.Scatter(x=tvec, y=[value(u[t]) for t in tvec], mode='lines', name='Use'))
+        fig.add_trace(go.Scatter(x=tvec, y=[value(c[t]) for t in tvec], mode='lines', name='Price'))
+    
+    fig.update_xaxes(tickvals=tvec_b[::24], ticktext=[str(t//24) for t in tvec_b[::24]])
     # add "Days" to x-axis
     # Add total cost to title
     fig.update_layout(
-        title=name + "    MPC of EVs (simulated data)       Total cost: " + str(round(value(prob.objective))) + " DKK",
+        title=name + "    MPC of EVs (simulated data)       Total cost: " + str(round(obj)) + " DKK",
         xaxis_title="Days",
         yaxis_title="kWh or DKK/kWh",)
     fig.show()
 
     ## Export figure
     if export:
-        fig.write_html("../../plots/MPC/mpc1.html")
+        fig.write_html( "../plots/MPC/" + name + "_mpc.html")
 
 # Plot results
-plot_EMPC(prob, tvec, 'SmartCharge')
+plot_EMPC(prob, 'SmartCharge')
 
 
 
@@ -160,81 +181,23 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
     prob.solve()
 
     # Return results
-    return(prob)
+    return(prob, x, b)
 
 # Run the problem
-prob = DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+prob, x, b = DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
 
 # Plot results
-plot_EMPC(prob, tvec, 'DumbCharge')
+plot_EMPC(prob, 'DumbCharge')
 
 
 
 
 
-######################################################
-### 3. Implementation of day-ahead
-######################################################
-
-
-
-c = dfsub['DKK'].to_numpy()
-T = len(c)-1
-tvec = np.arange(0,T+1)
-
-# External variables (SIMULATED)
-z = np.piecewise(tvec, [(((tvec % 24) >= np.ceil(plugin)) | ((tvec % 24) <= np.floor(plugout-0.01)))], [1,0]) # [0,1] plugged in at tc = 5.5 - z*np.random.uniform(-1,2,T+1) # cost of electricity at t
-c_tilde = min(c[-0:24]) # Value of remaining electricity: lowest el price the past 24h
-u = np.random.uniform(8,16,T+1) * (tvec % 24 == np.floor(plugin)-1)
-bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
-
-def DayAhead(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
-    # Identify plug-ins: When z turns from 0 to 1
-    indx_plug_ins = np.where(np.diff(z) == 1)[0]
-    #times_plug_in = df['HourDK'][indx_plug_in]
-    for plug_in in indx_plug_ins:
-        time_plug_in = df['HourDK'][plug_in]
-        if time_plug_in.hour >= 15:  ### ASSUME day-ahead prices are available from 15.00 (SIMULATION)
-            avail_day_ahead = True
-        else:
-            avail_day_ahead = False
-
-        # Define available day-ahead prices
-        if avail_day_ahead:
-            last_price_avail = time_plug_in + dt.timedelta(days=1)
-            last_price_avail = last_price_avail.replace(hour=23)    
-        else:
-            last_price_avail = time_plug_in.replace(hour=23)
-
-        flex_indx = (dfsub['HourDK'] >= time_plug_in) & (dfsub['HourDK'] <= last_price_avail).to_numpy()
-        c = dfsub['DKK'][flex_indx].to_numpy()
-        c_tilde = min(c)
-        T = len(c)-1
-        global tvec_flex
-        tvec_flex = np.arange(0,T+1)
-
-        # Find relevant input at the specific hours of flexibility
-        z_flex = z[flex_indx]
-        u_flex = u[flex_indx]
-        bmin_flex = np.piecewise(np.append(tvec_flex,T+1), [np.append(tvec_flex,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
-        b0 = b0 # MANGLER REKURSION
-
-        # For known day-ahead prices, this is a perfect foresight problem
-        prob = PerfectForesight(b0, bmax, bmin_flex, xmax, c, c_tilde, u_flex, z_flex, T, tvec_flex)
-
-        if plug_in == 17:
-            break;
-    # Mangler at BINDE LOOPS SAMMEN
-    return(prob)
-
-# Run the problem
-prob = DayAhead(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
-plot_EMPC(prob, tvec_flex, 'PerfectForesight')
 
 
 
 ######################################################
-### 4. Run models on real prices #####################
+### 3. Implementation of DAY-AHEAD (Virker sgu ikke helt - drop den og gå videre til MultiDay). Der er noget galt med priserne på plottet.
 ######################################################
 
 c = df['DKK'].to_numpy()
@@ -247,12 +210,176 @@ c_tilde = min(c[-0:24]) # Value of remaining electricity: lowest el price the pa
 u = np.random.uniform(8,16,T+1) * (tvec % 24 == np.floor(plugin)-1)
 bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
 
-#######
-# Perfect Foresight
-prob = PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
-plot_EMPC(prob, tvec, 'PerfectForesight')
+def DayAhead(df, b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
+    # Identify plug-ins: When z turns from 0 to 1
+    indx_plug_ins = np.where(np.diff(z) == 1)[0]
+    
+    # Init result store
+    xs = []
+    bs = []
+    us = []
+    cs = []
+    costs = []
+    total_cost = 0
 
-# Dumb Charge
-prob = DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
-plot_EMPC(prob, tvec, 'DumbCharge')
-# Juhuu :-D Besparelse: ca. 66 % af prisen.
+    for plug_in in indx_plug_ins:
+        time_plug_in = df['HourDK'][plug_in]
+        if time_plug_in.hour >= 13:  ### ASSUME day-ahead prices are available from 13 o'clock
+            avail_day_ahead = True
+        else:
+            avail_day_ahead = False
+
+        # Define available day-ahead prices
+        if avail_day_ahead:
+            last_price_avail = time_plug_in + dt.timedelta(days=1)
+            last_price_avail = last_price_avail.replace(hour=23)    
+        else:
+            last_price_avail = time_plug_in.replace(hour=23)
+
+        # Subset the day-ahead problem
+        flex_indx = (df['HourDK'] >= time_plug_in) & (df['HourDK'] <= last_price_avail).to_numpy()
+        c = df['DKK'][flex_indx].to_numpy()
+        c_tilde = min(c)
+        T = len(c)-1
+        tvec_flex = np.arange(0,T+1)
+
+        # Find relevant input at the specific hours of flexibility
+        z_flex = z[flex_indx]
+        u_flex = u[flex_indx]
+        bmin_flex = np.piecewise(np.append(tvec_flex,T+1), [np.append(tvec_flex,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
+
+        # For known day-ahead prices, this is a perfect foresight problem
+        prob, x, b = PerfectForesight(b0, bmax, bmin_flex, xmax, c, c_tilde, u_flex, z_flex, T, tvec_flex)
+        b0 = value(b[T]) # Save b0 for next iteration
+        
+        # Store results
+        xs.append([value(x[t]) for t in tvec_flex])
+        bs.append([value(b[t]) for t in tvec_flex])
+        us.append([value(u_flex[t]) for t in tvec_flex])
+        cs.append([value(c[t]) for t in tvec_flex])
+        costs.append(value(prob.objective))
+        total_cost += value(prob.objective)
+
+    # Flatten list of lists
+    xss = [item for sublist in xs for item in sublist]
+    bss = [item for sublist in bs for item in sublist]
+    uss = [item for sublist in us for item in sublist]
+    css = [item for sublist in cs for item in sublist]
+
+    # Tie results intro prob
+    prob = {'x':xss, 'b':bss, 'u':uss, 'c':css, 'costs':costs, 'objective':total_cost}
+    return(prob, x, b)
+
+# Run the problem
+prob, x, b = DayAhead(df, b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+plot_EMPC(prob, 'DayAhead')
+
+
+
+#####################################################
+### 4. Multi-day Smart Charging #####################
+#####################################################
+####### Designed for re-run every hour ##############
+
+# External variables (SIMULATED) (SLAP KODE LIGE HER)
+T = 4*24 # 4 days
+N = len(df)
+T = N # Length of experiment
+tvec = np.arange(0,T)
+z = np.piecewise(tvec, [(((tvec % 24) >= np.ceil(plugin)) | ((tvec % 24) <= np.floor(plugout-0.01)))], [1,0]) # [0,1] plugged in at tc = 5.5 - z*np.random.uniform(-1,2,T+1) # cost of electricity at t
+u = np.random.uniform(8,16,T) * (tvec % 24 == np.floor(plugin)-1)
+bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
+
+# Horizon of multi-day
+T = 4*24 # 4 days
+
+def MultiDay(df, u, z, T, b0, bmax, bmin, xmax):
+    N = len(df)
+    L = N-T # Length of experiment
+    tvec = np.arange(0,T+1)
+    B = np.empty((L+1)); B[:] = np.nan; B[0] = b0;
+    X = np.empty((L)); X[:] = np.nan
+
+    # Loop over all hours, where there is still T hours remaining of the data
+    for i in range(0, L):
+        print("i = " + str(i))
+        # Subset input
+        tvec_i = np.arange(i, i+T+1)
+        c = df['DKK'][tvec_i].to_numpy()
+        c_tilde = np.quantile(c, 0.1) # 10 % quantile
+
+        # Find relevant input at the specific hours of flexibility
+        z_i = z[tvec_i]
+        u_i = u[tvec_i]
+        bmin_i = bmin[np.append(tvec_i, tvec[-1]+1)]
+
+        # Solve
+        prob, x, b = PerfectForesight(b0, bmax, bmin_i, xmax, c, c_tilde, u_i, z_i, T, tvec, verbose=False)
+ 
+        # Implement/store only the first step, and re-run in next hour
+        x0 = value(x[0]); X[i]=x0;      # Amount charged in the now-hour
+        b1 = value(b[1]); B[i+1]=b1;    # Battery level after the now-hour / beggining of next hour
+        b0 = b1                         # Next SOC start is the current SOC
+
+    # Costs
+    c_tilde = np.quantile(df['DKK'], 0.1)
+    total_cost = np.dot(X,df['DKK'][0:L]) - c_tilde * B[-1]
+
+    # Tie results intro prob
+    prob = {'x':X, 'b':B, 'u':u[0:L], 'c':df['DKK'][0:L], 'objective':total_cost}
+    return(prob, x, b)
+
+# Run the problem
+prob, x, b = MultiDay(df, u, z, T, b0, bmax, bmin, xmax)
+plot_EMPC(prob, 'MultiDay', export=True)
+    
+
+
+
+
+
+
+######################################################
+### 5. Run models on real prices #####################
+######################################################
+
+c = df['DKK'].to_numpy()
+#T = len(c)-1
+#tvec = np.arange(0,T+1)
+
+# External variables (SIMULATED)
+#z = np.piecewise(tvec, [(((tvec % 24) >= np.ceil(plugin)) | ((tvec % 24) <= np.floor(plugout-0.01)))], [1,0]) # [0,1] plugged in at tc = 5.5 - z*np.random.uniform(-1,2,T+1) # cost of electricity at t
+c_tilde = np.quantile(c, 0.1) #min(c[-0:24]) # Value of remaining electricity: lowest el price the past 24h
+#u = np.random.uniform(8,16,T+1) * (tvec % 24 == np.floor(plugin)-1)
+#bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
+
+# External variables (SIMULATED) (SLAP KODE LIGE HER)
+T = 4*24 # 4 days
+N = len(df)
+T = N # Length of experiment
+tvec = np.arange(0,T+1)
+z = np.piecewise(tvec, [(((tvec % 24) >= np.ceil(plugin)) | ((tvec % 24) <= np.floor(plugout-0.01)))], [1,0]) # [0,1] plugged in at tc = 5.5 - z*np.random.uniform(-1,2,T+1) # cost of electricity at t
+u = np.random.uniform(8,16,T+1) * (tvec % 24 == np.floor(plugin)-1) # uniform(8,16, T eller T+1? MANGLER)
+bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
+
+
+###########
+# Perfect Foresight
+prob, x, b = PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+plot_EMPC(prob, 'PerfectForesight')
+
+### Dumb Charge
+prob, x, b = DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+plot_EMPC(prob, 'DumbCharge')
+# Juhuu :-D  Næsten 5 gange besparelse!!!
+# MAGLER: Fix at det kun virker nogle gange - noget med endpoints for z?
+
+### DayAhead (virker ikke 100 %)
+prob, x, b = DayAhead(df, b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+plot_EMPC(prob, 'DayAhead')
+
+### MultiDay
+T = 4*24 # Horizon: 4 days
+prob, x, b = MultiDay(df, u, z, T, b0, bmax, bmin, xmax)
+plot_EMPC(prob, 'MultiDay')
+    
