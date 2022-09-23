@@ -122,7 +122,7 @@ def plot_EMPC(prob, name="",export=False):
     # add "Days" to x-axis
     # Add total cost to title
     fig.update_layout(
-        title=name + "    MPC of EVs (simulated data)       Total cost: " + str(round(obj)) + " DKK",
+        title=name + "    MPC of EVs (simulated consumer data)        September 2022       Total cost: " + str(round(obj)) + " DKK",
         xaxis_title="Days",
         yaxis_title="kWh or DKK/kWh",)
     fig.show()
@@ -197,12 +197,12 @@ plot_EMPC(prob, 'DumbCharge')
 
 
 ######################################################
-### 3. Implementation of DAY-AHEAD (Virker sgu ikke helt - drop den og gå videre til MultiDay). Der er noget galt med priserne på plottet.
+### 3. Implementation of DAY-AHEAD Smart Charge ######
 ######################################################
 
 c = df['DKK'].to_numpy()
 T = len(c)-1
-tvec = np.arange(0,T+1)
+tvec = np.arange(T+1)
 
 # External variables (SIMULATED)
 z = np.piecewise(tvec, [(((tvec % 24) >= np.ceil(plugin)) | ((tvec % 24) <= np.floor(plugout-0.01)))], [1,0]) # [0,1] plugged in at tc = 5.5 - z*np.random.uniform(-1,2,T+1) # cost of electricity at t
@@ -210,7 +210,7 @@ c_tilde = min(c[-0:24]) # Value of remaining electricity: lowest el price the pa
 u = np.random.uniform(8,16,T+1) * (tvec % 24 == np.floor(plugin)-1)
 bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
 
-def DayAhead(df, b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
+def DayAhead(df, b0, bmax, bmin, xmax, c_tilde, u, z, tvec):
     # Identify plug-ins: When z turns from 0 to 1
     indx_plug_ins = np.where(np.diff(z) == 1)[0]
     
@@ -246,7 +246,8 @@ def DayAhead(df, b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
         # Find relevant input at the specific hours of flexibility
         z_flex = z[flex_indx]
         u_flex = u[flex_indx]
-        bmin_flex = np.piecewise(np.append(tvec_flex,T+1), [np.append(tvec_flex,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
+        #bmin_flex = np.piecewise(np.append(tvec_flex,T+1), [np.append(tvec_flex,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
+        bmin_flex = bmin[np.append(tvec_flex, tvec[-1]+1)]
 
         # For known day-ahead prices, this is a perfect foresight problem
         prob, x, b = PerfectForesight(b0, bmax, bmin_flex, xmax, c, c_tilde, u_flex, z_flex, T, tvec_flex)
@@ -257,8 +258,6 @@ def DayAhead(df, b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
         bs.append([value(b[t]) for t in tvec_flex])
         us.append([value(u_flex[t]) for t in tvec_flex])
         cs.append([value(c[t]) for t in tvec_flex])
-        costs.append(value(prob.objective))
-        total_cost += value(prob.objective)
 
     # Flatten list of lists
     xss = [item for sublist in xs for item in sublist]
@@ -266,12 +265,15 @@ def DayAhead(df, b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
     uss = [item for sublist in us for item in sublist]
     css = [item for sublist in cs for item in sublist]
 
+    # Costs
+    total_cost = np.dot(np.array(xss), np.array(css)) - c_tilde * bss[-1]
+
     # Tie results intro prob
-    prob = {'x':xss, 'b':bss, 'u':uss, 'c':css, 'costs':costs, 'objective':total_cost}
+    prob = {'x':xss, 'b':bss, 'u':uss, 'c':css, 'objective':total_cost}
     return(prob, x, b)
 
 # Run the problem
-prob, x, b = DayAhead(df, b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+prob, x, b = DayAhead(df, b0, bmax, bmin, xmax, c_tilde, u, z, tvec)
 plot_EMPC(prob, 'DayAhead')
 
 
@@ -285,26 +287,26 @@ plot_EMPC(prob, 'DayAhead')
 T = 4*24 # 4 days
 N = len(df)
 T = N # Length of experiment
-tvec = np.arange(0,T)
+tvec = np.arange(T)
 z = np.piecewise(tvec, [(((tvec % 24) >= np.ceil(plugin)) | ((tvec % 24) <= np.floor(plugout-0.01)))], [1,0]) # [0,1] plugged in at tc = 5.5 - z*np.random.uniform(-1,2,T+1) # cost of electricity at t
 u = np.random.uniform(8,16,T) * (tvec % 24 == np.floor(plugin)-1)
 bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
 
 # Horizon of multi-day
-T = 4*24 # 4 days
+h = 4*24 # 4 days
 
-def MultiDay(df, u, z, T, b0, bmax, bmin, xmax):
+def MultiDay(df, u, z, h, b0, bmax, bmin, xmax):
     N = len(df)
-    L = N-T # Length of experiment
-    tvec = np.arange(0,T+1)
+    L = N-h # Length of experiment
+    tvec = np.arange(0,h+1)
     B = np.empty((L+1)); B[:] = np.nan; B[0] = b0;
     X = np.empty((L)); X[:] = np.nan
 
     # Loop over all hours, where there is still T hours remaining of the data
     for i in range(0, L):
-        print("i = " + str(i))
+        if i%50 == 0: print("i = " + str(i) + " of " + str(L))
         # Subset input
-        tvec_i = np.arange(i, i+T+1)
+        tvec_i = np.arange(i, i+h+1)
         c = df['DKK'][tvec_i].to_numpy()
         c_tilde = np.quantile(c, 0.1) # 10 % quantile
 
@@ -314,7 +316,7 @@ def MultiDay(df, u, z, T, b0, bmax, bmin, xmax):
         bmin_i = bmin[np.append(tvec_i, tvec[-1]+1)]
 
         # Solve
-        prob, x, b = PerfectForesight(b0, bmax, bmin_i, xmax, c, c_tilde, u_i, z_i, T, tvec, verbose=False)
+        prob, x, b = PerfectForesight(b0, bmax, bmin_i, xmax, c, c_tilde, u_i, z_i, h, tvec, verbose=False)
  
         # Implement/store only the first step, and re-run in next hour
         x0 = value(x[0]); X[i]=x0;      # Amount charged in the now-hour
@@ -330,8 +332,8 @@ def MultiDay(df, u, z, T, b0, bmax, bmin, xmax):
     return(prob, x, b)
 
 # Run the problem
-prob, x, b = MultiDay(df, u, z, T, b0, bmax, bmin, xmax)
-plot_EMPC(prob, 'MultiDay', export=True)
+prob, x, b = MultiDay(df, u, z, h, b0, bmax, bmin, xmax)
+plot_EMPC(prob, 'Multi-Day Smart Charge', export=True)
     
 
 
@@ -343,6 +345,10 @@ plot_EMPC(prob, 'MultiDay', export=True)
 ### 5. Run models on real prices #####################
 ######################################################
 
+dfcopy = df
+df = dfcopy.iloc[:200]
+
+h = 4*24 # 4 days horizon for the multi-day smart charge
 c = df['DKK'].to_numpy()
 #T = len(c)-1
 #tvec = np.arange(0,T+1)
@@ -354,17 +360,16 @@ c_tilde = np.quantile(c, 0.1) #min(c[-0:24]) # Value of remaining electricity: l
 #bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
 
 # External variables (SIMULATED) (SLAP KODE LIGE HER)
-T = 4*24 # 4 days
-N = len(df)
-T = N # Length of experiment
-tvec = np.arange(0,T+1)
+
+T = len(c)-1-h # N-1 # N-T
+tvec = np.arange(T+1)
 z = np.piecewise(tvec, [(((tvec % 24) >= np.ceil(plugin)) | ((tvec % 24) <= np.floor(plugout-0.01)))], [1,0]) # [0,1] plugged in at tc = 5.5 - z*np.random.uniform(-1,2,T+1) # cost of electricity at t
 u = np.random.uniform(8,16,T+1) * (tvec % 24 == np.floor(plugin)-1) # uniform(8,16, T eller T+1? MANGLER)
 bmin = np.piecewise(np.append(tvec,T+1), [np.append(tvec,T+1) % 24 == np.ceil(plugout)], [bmin_morning, 1])
 
 
-###########
-# Perfect Foresight
+##########################
+### Perfect Foresight
 prob, x, b = PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
 plot_EMPC(prob, 'PerfectForesight')
 
@@ -374,12 +379,14 @@ plot_EMPC(prob, 'DumbCharge')
 # Juhuu :-D  Næsten 5 gange besparelse!!!
 # MAGLER: Fix at det kun virker nogle gange - noget med endpoints for z?
 
-### DayAhead (virker ikke 100 %)
-prob, x, b = DayAhead(df, b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+### DayAhead
+# Ensure to evaluate on the same days as the other models
+prob, x, b = DayAhead(df.iloc[:-h+1], b0, bmax, bmin, xmax, c_tilde, u, z, tvec)
 plot_EMPC(prob, 'DayAhead')
 
 ### MultiDay
-T = 4*24 # Horizon: 4 days
-prob, x, b = MultiDay(df, u, z, T, b0, bmax, bmin, xmax)
+prob, x, b = MultiDay(df, u, z, h, b0, bmax, bmin, xmax)
 plot_EMPC(prob, 'MultiDay')
-    
+    # Perfect Foresight = MultiDay(h=inf)
+    # Dumb Charge = MultiDay(h=0)
+    # DayAhead = MultiDay(h=[12-36])
