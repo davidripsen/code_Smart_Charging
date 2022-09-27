@@ -6,19 +6,24 @@
 from pulp import *
 import numpy as np
 import plotly.graph_objects as go
+import plotly.express as px
 import pandas as pd
 import datetime as dt
 
 # Read prices
-df = pd.read_csv("../data/df_spot_sept22.csv")
+df = pd.read_csv("../data/df_spot_2022.csv")
 df['HourDK'] = pd.to_datetime(df['HourDK'])
     # Convert Spot prices to DKK/kWh
 df['DKK'] = df['SpotPriceDKK']/1000
 df = df.drop(['PriceArea', 'SpotPriceEUR', 'SpotPriceDKK'], axis=1)
     # Flip order of rows and reset index
 df = df.iloc[::-1].reset_index(drop=True)
-    # Subset the first three days of df
-dfsub = df.iloc[:72]
+
+# Subset for approx 6 months
+df = df[df['HourDK'] > '2022-03-28']
+df.reset_index(drop=True, inplace=True)
+
+
 
 ############# SIMULATION OF DATA: EV behaviour and prices #################
 # Horizon
@@ -57,7 +62,7 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, verbose=Tr
     b[0] = b0
 
     # Objective
-    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * (b[T+1]))
+    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * ((b[T+1])-b[0]))
 
     # Constraints
     for t in tvec:
@@ -158,7 +163,7 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
     M = 10**6
 
     # Objective
-    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * b[T+1])
+    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * (b[T+1]-b[0]))
 
     # Constraints
     for t in tvec:
@@ -166,7 +171,7 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
         prob += b[t+1] >= bmin[t+1]
         prob += b[t] <= bmax
         
-        ######## DUMB CHARGE ######## (MISSING: working)
+        ######## DUMB CHARGE ########
         ### Implement in OR-terms: x[t] == min(z[t]*xmax, bmax-b[t])
         #######
         # Ensure i[t] == 1, if z[t]*xmax < bmax-b[t] (dvs. i=1 når der er rigeligt plads på batteriet)
@@ -188,12 +193,18 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
 
 # Run the problem
 prob, x, b = DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
+print("Status:", LpStatus[prob.status])
 
 # Plot results
 plot_EMPC(prob, 'DumbCharge')
 
+# Get delta difference of HourDK
+print("Status:", LpStatus[prob.status])
+print("Objective:", value(prob.objective))
 
+df[2038:2045]
 
+px.line(np.diff(df.HourDK)).show()
 
 
 
@@ -274,7 +285,7 @@ def DayAhead(dff, b0, bmax, bmin, xmax, c_tilde, u, z, tvec):
     css = [item for sublist in cs for item in sublist]
 
     # Costs
-    total_cost = np.dot(np.array(xss), np.array(css)) - c_tilde * bss[-1]
+    total_cost = np.dot(np.array(xss), np.array(css)) - c_tilde * (bss[-1]-bss[0])
 
     # Tie results intro prob
     prob = {'x':xss, 'b':bss, 'u':uss, 'c':css, 'objective':total_cost}
@@ -332,8 +343,7 @@ def MultiDay(df, u, z, h, b0, bmax, bmin, xmax, c_tilde):
         b0 = b1                         # Next SOC start is the current SOC
 
     # Costs
-    c_tilde = np.quantile(df['DKK'], 0.1)
-    total_cost = np.dot(X,df['DKK'][0:L]) - c_tilde * B[-1]
+    total_cost = np.dot(X,df['DKK'][0:L]) - c_tilde * (B[-1] - B[0])
 
     # Tie results intro prob
     prob = {'x':X, 'b':B, 'u':u[0:L], 'c':df['DKK'][0:L], 'objective':total_cost}
@@ -392,7 +402,7 @@ plot_EMPC(prob, 'Day-ahead Smart Charge', export=True)
 
 ### MultiDay
 prob, x, b = MultiDay(df, u, z, h, b0, bmax, bmin, xmax, c_tilde)
-plot_EMPC(prob, 'Multi-Day Smart Charge', export=True)
+plot_EMPC(prob, 'Multi-Day (Perfect Foresight) Smart Charge', export=True)
     # Perfect Foresight = MultiDay(h=inf)
     # Dumb Charge = MultiDay(h=0)
     # DayAhead = MultiDay(h=[12-36])
