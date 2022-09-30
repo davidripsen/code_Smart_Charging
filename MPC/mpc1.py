@@ -11,7 +11,7 @@ import pandas as pd
 import datetime as dt
 
 # Read prices
-df = pd.read_csv("../data/df_spot_2022.csv")
+df = pd.read_csv("data/df_spot_2022.csv")
 df['HourDK'] = pd.to_datetime(df['HourDK'])
     # Convert Spot prices to DKK/kWh
 df['DKK'] = df['SpotPriceDKK']/1000
@@ -22,6 +22,10 @@ df = df.iloc[::-1].reset_index(drop=True)
 # Subset for approx 6 months
 df = df[df['HourDK'] > '2022-03-28']
 df.reset_index(drop=True, inplace=True)
+
+# Add tarifs to the price
+df['DKK'] = df['DKK'] + 0.5
+
 
 
 
@@ -91,7 +95,7 @@ for v in prob.variables():
     print(v.name, "=", v.varValue)
 
 # Export model
-prob.writeLP("MPC/lp-files/mpc1.lp")
+#prob.writeLP("MPC/lp-files/mpc1.lp")
 
 
 
@@ -137,7 +141,7 @@ def plot_EMPC(prob, name="",export=False):
 
     ## Export figure
     if export:
-        fig.write_html( "../plots/MPC/" + name + "_mpc.html")
+        fig.write_html( "plots/MPC/" + name + "_mpc.html")
 
 # Plot results
 plot_EMPC(prob, 'SmartCharge')
@@ -169,7 +173,7 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
     for t in tvec:
         prob += b[t+1] == b[t] + x[t] - u[t]
         prob += b[t+1] >= bmin[t+1]
-        prob += b[t] <= bmax
+        prob += b[t+1] <= bmax
         
         ######## DUMB CHARGE ########
         ### Implement in OR-terms: x[t] == min(z[t]*xmax, bmax-b[t])
@@ -383,6 +387,18 @@ u_within = u[0:T_within+1]
 bmin_within = bmin[0:T_within+2]
 df_within = df[0:T_within+1]
 
+prob, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within)
+# Save this iteration of sim
+T1 = T_within
+z1 = z_within
+u1 = u_within
+bmin1 = bmin_within
+c1 = c_within
+c_tilde1 = c_tilde
+
+print(T1); print(z1); print(u1)
+
+
 ##########################
 ### Perfect Foresight
 prob, x, b = PerfectForesight(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within)
@@ -391,8 +407,13 @@ plot_EMPC(prob, 'Perfect Foresight', export=True)
 ### Dumb Charge
 prob, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within)
 plot_EMPC(prob, 'Dumb Charge', export=True)
-# Juhuu :-D  Næsten 5 gange besparelse!!!
-# MAGLER: Fix at det kun virker nogle gange - noget med endpoints for z?
+# The problem arises for data between 2022-05-15 og 2022-05-16. Subset the data in this interval
+print(df[(df.HourDK >= '2022-05-15 00:00:00') & (df.HourDK <= '2022-05-16 23:00:00')].to_markdown())
+# And then all of a sudden it works again (?????????)
+#prob, x, b = MultiDay(df, u, z, 0, b0, bmax, bmin, xmax, c_tilde) # Dumb Charge = MultiDay(h=0)
+#plot_EMPC(prob, 'Dumb Charge', export=False)
+
+
 
 ### DayAhead
 # Ensure to evaluate on the same days as the other models
@@ -406,3 +427,5 @@ plot_EMPC(prob, 'Multi-Day (Perfect Foresight) Smart Charge', export=True)
     # Perfect Foresight = MultiDay(h=inf)
     # Dumb Charge = MultiDay(h=0)
     # DayAhead = MultiDay(h=[12-36])
+
+
