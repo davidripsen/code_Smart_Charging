@@ -6,29 +6,100 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import datetime as dt
+import json
+import plotly.express as px
+from matplotlib import pyplot as plt
 
 # Read the csv file
-df = pd.read_csv('data/forecastsGreenerEl/prognoser.csv', sep=',', header=0, index_col=0, parse_dates=True)
+df = pd.read_csv('data/forecastsGreenerEl/prognoser.csv', sep=',', header=0, parse_dates=True)
 
-# Substract DK2 and disregard 2 rows of different data format
-df = df['DK2']
-df = df.iloc[2:]
-print(df)
+# Convert Atime and Time to datetime
+df['Atime'] = pd.to_datetime(df['Atime'], format='%Y-%m-%d %H:%M:%S')
+df['Time'] = pd.to_datetime(df['Time'], format='%Y-%m-%d %H:%M:%S')
 
-# print df[2] nicely
-print(df[2])
-df[0]
-type(df[0])
-dict(df[0])
+# Append true spot price to the dataframe
+dfspot = pd.read_csv('data/spotprice/df_spot.csv', sep=',', header=0, parse_dates=True)
+dfspot = dfspot[dfspot['PriceArea'] == 'DK2']
+dfspot.rename(columns={'HourDK': 'Time', 'SpotPriceEUR':'TruePrice'}, inplace=True)
+dfspot.drop(columns=['PriceArea', 'SpotPriceDKK'], inplace=True)
+dfspot['Time'] = pd.to_datetime(dfspot['Time'], format='%Y-%m-%d %H:%M:%S')
 
-# Convert to PTime Atime value
+# Merge df and dfspot on Time
+df = pd.merge(df, dfspot, on='Time', how='left')
+del dfspot
 
-#
-for i in range(len(df)):
-    print(f'Forecast created: ', df.index[i])
-    print(df[i][:50])
-    print(f'\n')
-    #df[i] = dict(df[i])
-    #df[i] = df[i]['PTime']
-    #df[i] = dt.datetime.strptime(df[i], '%Y-%m-%dT%H:%M:%S')
-    #df[i] = df[i].strftime('%H:%M')
+
+# Plot Price vs TruePrice using plotly
+import plotly.graph_objects as go
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=df['Time'], y=df['Price'], mode='lines', name='Price'))
+fig.add_trace(go.Scatter(x=df['Time'], y=df['TruePrice'], mode='lines', name='TruePrice'))
+fig.update_layout(title='Price vs TruePrice', xaxis_title='Time', yaxis_title='Price')
+fig.show()
+
+# For each unique Atime, plot the Price and TruePrice using matplotlib and save to pdf
+run = False
+if run: # Change to run=True for plotting
+    for Atime in df['Atime'].unique():
+        dfA = df[df['Atime'] == Atime]
+        fig, ax = plt.subplots()
+        ax.plot(dfA['Time'], dfA['Price'], label='Price')
+        ax.plot(dfA['Time'], dfA['TruePrice'], label='TruePrice')
+        ax.set_title('Price vs TruePrice for Atime = ' + str(Atime))
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Price')
+        ax.legend()
+        fig.savefig('plots/plot_' + str(Atime) + '.pdf')
+        plt.close(fig)
+
+
+# For each unique Atime, print the Price and TruePrice
+for Atime in df['Atime'].unique():
+    dfA = df[df['Atime'] == Atime]
+    print(dfA[['Atime', 'Time', 'Price', 'TruePrice']])
+    print(' ')
+
+# Show prediction horizon at each Atime
+print(df['Atime'].value_counts().to_string())
+    # Hor = 101-200 hours (min. 4 day, consider 5 days and fill some steps)
+
+
+##############################################################################
+# Change df into MPC-friendly format with constant timesteps
+##############################################################################
+h = 100 # horizon
+
+def SliceDataFrame(df, h, var='Price', use_known_prices=False, dftrue=None):
+    # Create dataframe with Price as values from df and where Time is split into columns from 0 to 100 and Atime as rows
+    df2 = pd.DataFrame(columns=['Atime'] + ['t' + str(i) for i in range(0,h+1)])
+    df2['Atime'] = df['Atime'].unique()
+    for Atime in df['Atime'].unique():
+        for i in range(0, h+1):
+            df2.loc[df2['Atime'] == Atime, 't' + str(i)] = df[df['Atime'] == Atime][var].values[i]
+
+    if use_known_prices & (dftrue is not None):
+        print('Using known prices')
+        # Hours ahead where price is known
+        wellknownhours = 48 - (df2['Atime'].dt.hour + 1)
+
+        # Replace values        
+        for j, wk in enumerate(wellknownhours):
+            for i in range(0, wk):
+                df2.loc[j, 't' + str(i)] = dftrue.loc[j, 't' + str(i)]
+
+    return df2
+dft = SliceDataFrame(df, h, var='TruePrice') #df with TruePrice as values
+dfp = SliceDataFrame(df, h, var='Price', use_known_prices=True, dftrue=dft) #df with (predicted) Price as values
+
+# Export to csv
+dft.to_csv('data/MPC-ready/df_trueprices_for_mpc.csv', index=False)
+dfp.to_csv('data/MPC-ready/df_predprices_for_mpc.csv', index=False)
+
+### Conclusion on forecasts quaility from GreenerEl: ###
+# They are OK, but
+# 1) When the first 12-36 hours are completely known, they should be part of the "forecast" (HANDLED)
+#     - All forecasts are made AFTER that the spot prices are publicly available at NordPool.
+#     - So it is reasonable to assume known prices for the rest of the day and the day after.
+# 2) The forecasts (at Atime) typicaly starts with forecasting an hour or two of the alread passed time. (HANDLED)
+# 3) Some days, multiple forecasts have been run. The forecasts do not agree (eventhough on known price). This should be dealt with.
+#    Probably by using the latest. (HANDLED) if MPC is identifying latest Atime when run.
