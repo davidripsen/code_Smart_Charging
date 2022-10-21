@@ -28,3 +28,5 @@ print(df['HourFC'].value_counts().to_string())
     # Der er super stor forskel på længden af de forskellige forecasts.
     #  + hvor mange gange han er kommet til at køre modellen / hvor mange modeller han har kørende.
     # Overvej bare at brug dem fra GitHub.
+
+df.FC.unique()

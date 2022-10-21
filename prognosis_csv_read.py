@@ -9,6 +9,7 @@ import datetime as dt
 import json
 import plotly.express as px
 from matplotlib import pyplot as plt
+plot = False
 
 # Read the csv file
 df = pd.read_csv('data/forecastsGreenerEl/prognoser.csv', sep=',', header=0, parse_dates=True)
@@ -38,8 +39,7 @@ fig.update_layout(title='Price vs TruePrice', xaxis_title='Time', yaxis_title='P
 fig.show()
 
 # For each unique Atime, plot the Price and TruePrice using matplotlib and save to pdf
-run = False
-if run: # Change to run=True for plotting
+if plot: # Change to run=True for plotting
     for Atime in df['Atime'].unique():
         dfA = df[df['Atime'] == Atime]
         fig, ax = plt.subplots()
@@ -77,6 +77,13 @@ def SliceDataFrame(df, h, var='Price', use_known_prices=False, dftrue=None):
         for i in range(0, h+1):
             df2.loc[df2['Atime'] == Atime, 't' + str(i)] = df[df['Atime'] == Atime][var].values[i]
 
+    # Calculate number of hours until next Atime
+    df2['Atime_next'] = df2['Atime'].shift(-1)
+    df2['Atime_next'] = df2['Atime_next'].fillna(df2['Atime'].iloc[-1])
+    diff = pd.Series((pd.Series(df2['Atime_next']).dt.ceil('H') - pd.Series(df2['Atime']).dt.ceil('H'))).dt
+    df2.insert(1, 'Atime_diff', (diff.days * 24 + diff.seconds/3600).astype(int))
+    df2.drop(columns=['Atime_next'], inplace=True)
+
     if use_known_prices & (dftrue is not None):
         print('Using known prices')
         # Hours ahead where price is known
@@ -95,7 +102,36 @@ dfp = SliceDataFrame(df, h, var='Price', use_known_prices=True, dftrue=dft) #df 
 dft.to_csv('data/MPC-ready/df_trueprices_for_mpc.csv', index=False)
 dfp.to_csv('data/MPC-ready/df_predprices_for_mpc.csv', index=False)
 
-### Conclusion on forecasts quaility from GreenerEl: ###
+# For each horizon t+str(i) plot the Price and TruePrice using matplotlib and save all figs in the same pdf
+if plot: # Change to run=True for plotting
+    fig, ax = plt.subplots()
+    for i in range(0, h+1):
+        ax.plot(dfp['Atime'], dfp['t' + str(i)], label='t+' + str(i))
+        ax.plot(dft['Atime'], dft['t' + str(i)], label='t+' + str(i))
+    ax.set_title('PredictedPrice vs TruePrice for Atime = ' + str(Atime))
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Price')
+    ax.legend()
+    fig.savefig('plots/PredictedPrice.pdf')
+    plt.close(fig)
+
+# For each Atime plot the Predicted Price (dfp) and TruePrice (dft) throughout the horizon
+if plot: # Change to run=True for plotting
+    for i, Atime in enumerate(dfp['Atime']):
+        fig, ax = plt.subplots()
+        ax.plot(dfp.iloc[i,1:], label='PredictedPrice', color='blue')
+        ax.plot(dft.iloc[i,1:], label='TruePrice', linestyle='-.', color='black')
+        ax.set_title('PredictedPrice vs TruePrice for Atime = ' + str(Atime))
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Price')
+        ax.legend()
+        fig.savefig('plots/PredMovie2/PredictedPrice_' + str(Atime) + '.pdf')
+    plt.close(fig)
+
+
+##############################################################################  
+    
+
 # They are OK, but
 # 1) When the first 12-36 hours are completely known, they should be part of the "forecast" (HANDLED)
 #     - All forecasts are made AFTER that the spot prices are publicly available at NordPool.

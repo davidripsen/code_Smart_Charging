@@ -11,7 +11,7 @@ import pandas as pd
 import datetime as dt
 
 # Read prices
-df = pd.read_csv("data/df_spot_2022.csv")
+df = pd.read_csv("data/spotprice/df_spot_2022.csv")
 df['HourDK'] = pd.to_datetime(df['HourDK'])
     # Convert Spot prices to DKK/kWh
 df['DKK'] = df['SpotPriceDKK']/1000
@@ -325,7 +325,7 @@ def MultiDay(df, u, z, h, b0, bmax, bmin, xmax, c_tilde):
     B = np.empty((L+1)); B[:] = np.nan; B[0] = b0;
     X = np.empty((L)); X[:] = np.nan
 
-    # Loop over all hours, where there is still T hours remaining of the data
+    # Loop over all hours, where there is still h hours remaining of the data
     for i in range(0, L):
         if i%50 == 0: print("i = " + str(i) + " of " + str(L))
         # Subset input
