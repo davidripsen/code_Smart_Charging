@@ -10,8 +10,9 @@ import plotly.express as px
 import pandas as pd
 import datetime as dt
 
+
 # Read prices
-df = pd.read_csv("data/spotprice/df_spot_2022.csv")
+df = pd.read_csv("data/spotprice/df_spot_sept22.csv")
 df['HourDK'] = pd.to_datetime(df['HourDK'])
     # Convert Spot prices to DKK/kWh
 df['DKK'] = df['SpotPriceDKK']/1000
@@ -19,13 +20,14 @@ df = df.drop(['PriceArea', 'SpotPriceEUR', 'SpotPriceDKK'], axis=1)
     # Flip order of rows and reset index
 df = df.iloc[::-1].reset_index(drop=True)
 
-# Subset for approx 6 months
-df = df[df['HourDK'] > '2022-03-28']
+# Subset last 3 months
+starttime = '2022-09-01'
+df = df[df['HourDK'] > starttime]
 df.reset_index(drop=True, inplace=True)
+endtime = str(df['HourDK'].iloc[-1].date())
 
 # Add tarifs to the price
-df['DKK'] = df['DKK'] + 0.5
-
+# (MISSING)
 
 
 
@@ -74,6 +76,7 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, verbose=Tr
         prob += b[t+1] >= bmin[t+1]
         prob += b[t] <= bmax
         prob += x[t] <= xmax*z[t]
+        prob += x[t] >= 0
                 # Debugging tips: Du kan ikke constrainte en variabels startpunkt, når startpunktet har fået en startværdi.
 
     # Solve problem
@@ -107,7 +110,7 @@ for v in prob.variables():
 ########### Visualise results using plotly ###########
 ######################################################
 
-def plot_EMPC(prob, name="",export=False):
+def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, export=False):
     # Identify iterative-appended, self-made prob
     fig = go.Figure()
     if type(prob) == dict:
@@ -133,10 +136,9 @@ def plot_EMPC(prob, name="",export=False):
 
     # add "Days" to x-axis
     # Add total cost to title
-    fig.update_layout(
-        title=name + "    MPC of EVs (simulated consumer data)        September 2022       Total cost: " + str(round(obj)) + " DKK",
+    fig.update_layout(title=name + "    MPC of EVs (simulated consumer data)        from " + starttime +" to "+ endtime+"      Total cost: " + str(round(obj)) + " DKK (+tariffs)",
         xaxis_title="Days",
-        yaxis_title="kWh or DKK/kWh",)
+        yaxis_title="kWh or DKK/kWh")
     fig.show()
 
     ## Export figure
@@ -144,7 +146,7 @@ def plot_EMPC(prob, name="",export=False):
         fig.write_html( "plots/MPC/" + name + "_mpc.html")
 
 # Plot results
-plot_EMPC(prob, 'SmartCharge')
+plot_EMPC(prob, 'SmartCharge', x, b, u, c, starttime=starttime, endtime=endtime)
 
 
 

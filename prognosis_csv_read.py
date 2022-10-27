@@ -1,6 +1,7 @@
  # Read prognoser.csv (as created by ../Spotprisprognose/data_extract.sh) using pandas
 # and plot the prognosis for the next 24 hours.
 
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,17 +10,18 @@ import datetime as dt
 import json
 import plotly.express as px
 from matplotlib import pyplot as plt
+import matplotlib.backends.backend_pdf
 plot = False
 
-# Read the csv file
+# Read the csv files
 df = pd.read_csv('data/forecastsGreenerEl/prognoser.csv', sep=',', header=0, parse_dates=True)
+dfspot = pd.read_csv('data/spotprice/df_spot.csv', sep=',', header=0, parse_dates=True)
 
 # Convert Atime and Time to datetime
 df['Atime'] = pd.to_datetime(df['Atime'], format='%Y-%m-%d %H:%M:%S')
 df['Time'] = pd.to_datetime(df['Time'], format='%Y-%m-%d %H:%M:%S')
 
 # Append true spot price to the dataframe
-dfspot = pd.read_csv('data/spotprice/df_spot.csv', sep=',', header=0, parse_dates=True)
 dfspot = dfspot[dfspot['PriceArea'] == 'DK2']
 dfspot.rename(columns={'HourDK': 'Time', 'SpotPriceEUR':'TruePrice'}, inplace=True)
 dfspot.drop(columns=['PriceArea', 'SpotPriceDKK'], inplace=True)
@@ -39,18 +41,20 @@ fig.update_layout(title='Price vs TruePrice', xaxis_title='Time', yaxis_title='P
 fig.show()
 
 # For each unique Atime, plot the Price and TruePrice using matplotlib and save to pdf
+pdf = matplotlib.backends.backend_pdf.PdfPages("plots/RawPredictions_movie.pdf")
 if plot: # Change to run=True for plotting
     for Atime in df['Atime'].unique():
         dfA = df[df['Atime'] == Atime]
-        fig, ax = plt.subplots()
-        ax.plot(dfA['Time'], dfA['Price'], label='Price')
-        ax.plot(dfA['Time'], dfA['TruePrice'], label='TruePrice')
-        ax.set_title('Price vs TruePrice for Atime = ' + str(Atime))
-        ax.set_xlabel('Time')
-        ax.set_ylabel('Price')
-        ax.legend()
-        fig.savefig('plots/plot_' + str(Atime) + '.pdf')
-        plt.close(fig)
+        fig = plt.figure()
+        plt.plot(dfA['Time'], dfA['Price'], label='Price')
+        plt.plot(dfA['Time'], dfA['TruePrice'], label='TruePrice')
+        plt.title('Price vs TruePrice for Atime = ' + str(Atime))
+        plt.xlabel('Time')
+        plt.ylabel('Price')
+        plt.legend()
+        #fig.savefig('plots/plot_' + str(Atime) + '.pdf')
+        pdf.savefig(fig)
+    pdf.close()
 
 
 # For each unique Atime, print the Price and TruePrice
@@ -62,20 +66,29 @@ for Atime in df['Atime'].unique():
 # Show prediction horizon at each Atime
 print(df['Atime'].value_counts().to_string())
     # Hor = 101-200 hours (min. 4 day, consider 5 days and fill some steps)
+minH = df['Atime'].value_counts().min()
 
 
 ##############################################################################
 # Change df into MPC-friendly format with constant timesteps
 ##############################################################################
-h = 100 # horizon
+h = 168 # horizon: t = 0..h
+BigM = 25000  # BigM padding value for padding forecasts [EUR/MWh]
 
-def SliceDataFrame(df, h, var='Price', use_known_prices=False, dftrue=None):
+def SliceDataFrame(df, h, var='Price', use_known_prices=False, dftrue=None, BigM=20000):
     # Create dataframe with Price as values from df and where Time is split into columns from 0 to 100 and Atime as rows
+    if var=='TruePrice': # Ensure for that residuals outside of horizon(forecasts) have a super high residual, not 0.
+        BigM = BigM*2
     df2 = pd.DataFrame(columns=['Atime'] + ['t' + str(i) for i in range(0,h+1)])
     df2['Atime'] = df['Atime'].unique()
     for Atime in df['Atime'].unique():
         for i in range(0, h+1):
-            df2.loc[df2['Atime'] == Atime, 't' + str(i)] = df[df['Atime'] == Atime][var].values[i]
+            vals = df[df['Atime'] == Atime][var].values
+            # Pad vals until length h+1 with BigM
+            vals = np.pad(vals, (0, np.max([0, h+1 - len(vals)+1]) ), 'constant', constant_values=BigM)
+            
+            #    
+            df2.loc[df2['Atime'] == Atime, 't' + str(i)] = vals[i]
 
     # Calculate number of hours until next Atime
     df2['Atime_next'] = df2['Atime'].shift(-1)
@@ -95,38 +108,27 @@ def SliceDataFrame(df, h, var='Price', use_known_prices=False, dftrue=None):
                 df2.loc[j, 't' + str(i)] = dftrue.loc[j, 't' + str(i)]
 
     return df2
-dft = SliceDataFrame(df, h, var='TruePrice') #df with TruePrice as values
-dfp = SliceDataFrame(df, h, var='Price', use_known_prices=True, dftrue=dft) #df with (predicted) Price as values
+dft = SliceDataFrame(df, h, var='TruePrice', BigM=BigM) #df with TruePrice as values
+dfp = SliceDataFrame(df, h, var='Price', use_known_prices=True, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
 
 # Export to csv
 dft.to_csv('data/MPC-ready/df_trueprices_for_mpc.csv', index=False)
 dfp.to_csv('data/MPC-ready/df_predprices_for_mpc.csv', index=False)
 
-# For each horizon t+str(i) plot the Price and TruePrice using matplotlib and save all figs in the same pdf
-if plot: # Change to run=True for plotting
-    fig, ax = plt.subplots()
-    for i in range(0, h+1):
-        ax.plot(dfp['Atime'], dfp['t' + str(i)], label='t+' + str(i))
-        ax.plot(dft['Atime'], dft['t' + str(i)], label='t+' + str(i))
-    ax.set_title('PredictedPrice vs TruePrice for Atime = ' + str(Atime))
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Price')
-    ax.legend()
-    fig.savefig('plots/PredictedPrice.pdf')
-    plt.close(fig)
-
 # For each Atime plot the Predicted Price (dfp) and TruePrice (dft) throughout the horizon
+pdf = matplotlib.backends.backend_pdf.PdfPages("plots/ModPredictions_movie.pdf")
 if plot: # Change to run=True for plotting
     for i, Atime in enumerate(dfp['Atime']):
-        fig, ax = plt.subplots()
-        ax.plot(dfp.iloc[i,1:], label='PredictedPrice', color='blue')
-        ax.plot(dft.iloc[i,1:], label='TruePrice', linestyle='-.', color='black')
-        ax.set_title('PredictedPrice vs TruePrice for Atime = ' + str(Atime))
-        ax.set_xlabel('Time')
-        ax.set_ylabel('Price')
-        ax.legend()
-        fig.savefig('plots/PredMovie2/PredictedPrice_' + str(Atime) + '.pdf')
-    plt.close(fig)
+        fig = plt.figure()
+        plt.plot(np.arange(0,h+1), dfp.iloc[i,2:(2+minH+1)], label='PredictedPrice')
+        plt.plot(np.arange(0,h+1), dft.iloc[i,2:(2+minH+1)], label='TruePrice', linestyle='-.', color='black')
+        plt.title('PredictedPrice vs TruePrice for Atime = ' + str(Atime))
+        plt.xlabel('Time [h]')
+        plt.ylabel('Price [EUR/MWh]')
+        plt.legend()
+        #fig.savefig('plots/PredMovie2/PredictedPrice_' + str(Atime) + '.pdf')
+        pdf.savefig(fig)
+    pdf.close()
 
 
 ##############################################################################  

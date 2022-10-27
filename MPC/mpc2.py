@@ -13,8 +13,11 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import datetime as dt
-from mpc1 import PerfectForesight, plot_EMPC, DumbCharge, DayAhead
-2+2
+import os
+# Load local functions
+os.chdir('/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/code_Smart_Charging/MPC')
+from FunctionCollection import PerfectForesight, plot_EMPC
+os.chdir('/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge')
 
 # Read the dfp and dft
 dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
@@ -22,7 +25,7 @@ dft = pd.read_csv('data/MPC-ready/df_trueprices_for_mpc.csv', sep=',', header=0,
 
 dft['Atime'] = pd.to_datetime(dft['Atime'], format='%Y-%m-%d %H:%M:%S')
 dfp['Atime'] = pd.to_datetime(dfp['Atime'], format='%Y-%m-%d %H:%M:%S')
-
+dfp
 
 
 ##### External variables (SIMULATED)
@@ -89,3 +92,13 @@ def MultiDay(dfp, u, z, h, b0, bmax, bmin, xmax, c_tilde):
 # Run the problem
 prob, x, b = MultiDay(df, u, z, h, b0, bmax, bmin, xmax, c_tilde)
 plot_EMPC(prob, 'Multi-Day Smart Charge', export=True)
+
+
+
+
+
+
+PerfectForesight(b0, bmax, bmin, xmax, np.linspace(0,10,h), 3, u, z, h, tvec, verbose=False)
+
+# NOTES:
+# ISSUE: At time of plug-in, the horizon is lower than h=98, because we only have (semi-)daily forecasts
