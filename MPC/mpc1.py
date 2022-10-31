@@ -9,10 +9,10 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import datetime as dt
-
+from matplotlib import pyplot as plt
 
 # Read prices
-df = pd.read_csv("data/spotprice/df_spot_sept22.csv")
+df = pd.read_csv("data/spotprice/df_spot.csv")
 df['HourDK'] = pd.to_datetime(df['HourDK'])
     # Convert Spot prices to DKK/kWh
 df['DKK'] = df['SpotPriceDKK']/1000
@@ -74,7 +74,7 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, verbose=Tr
     for t in tvec:
         prob += b[t+1] == b[t] + x[t] - u[t]
         prob += b[t+1] >= bmin[t+1]
-        prob += b[t] <= bmax
+        prob += b[t+1] <= bmax
         prob += x[t] <= xmax*z[t]
         prob += x[t] >= 0
                 # Debugging tips: Du kan ikke constrainte en variabels startpunkt, når startpunktet har fået en startværdi.
@@ -110,7 +110,7 @@ for v in prob.variables():
 ########### Visualise results using plotly ###########
 ######################################################
 
-def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, export=False):
+def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, export=False, starttime='', endtime=''):
     # Identify iterative-appended, self-made prob
     fig = go.Figure()
     if type(prob) == dict:
@@ -202,7 +202,7 @@ prob, x, b = DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec)
 print("Status:", LpStatus[prob.status])
 
 # Plot results
-plot_EMPC(prob, 'DumbCharge')
+plot_EMPC(prob, 'DumbCharge', x, b, u, c, starttime=starttime, endtime=endtime)
 
 # Get delta difference of HourDK
 print("Status:", LpStatus[prob.status])
@@ -264,7 +264,7 @@ def DayAhead(dff, b0, bmax, bmin, xmax, c_tilde, u, z, tvec):
         # Subset the day-ahead problem
         flex_indx = ((dff['HourDK'] >= time_plug_in) & (dff['HourDK'] <= last_price_avail)).to_numpy()
         c_flex = dff['DKK'][flex_indx].to_numpy()
-        c_tilde = min(c_flex)
+        #c_tilde = min(c_flex)
         h = len(c_flex)-1
         tvec_flex = np.arange(0,h+1)
 
@@ -404,14 +404,14 @@ print(T1); print(z1); print(u1)
 ##########################
 ### Perfect Foresight
 prob, x, b = PerfectForesight(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within)
-plot_EMPC(prob, 'Perfect Foresight', export=True)
+plot_EMPC(prob, 'Perfect Foresight', x , b, u, c, starttime=starttime, endtime=endtime, export=True)
 
 ### Dumb Charge
 prob, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within)
-plot_EMPC(prob, 'Dumb Charge', export=True)
+plot_EMPC(prob, 'Dumb Charge', x,b,u,c, starttime=starttime, endtime=endtime, export=True)
 # The problem arises for data between 2022-05-15 og 2022-05-16. Subset the data in this interval
 print(df[(df.HourDK >= '2022-05-15 00:00:00') & (df.HourDK <= '2022-05-16 23:00:00')].to_markdown())
-# And then all of a sudden it works again (?????????)
+# And then all of a sudden it works again (?????????) # MISSING: Sometimes infeasible for simulated data.
 #prob, x, b = MultiDay(df, u, z, 0, b0, bmax, bmin, xmax, c_tilde) # Dumb Charge = MultiDay(h=0)
 #plot_EMPC(prob, 'Dumb Charge', export=False)
 
@@ -421,11 +421,11 @@ print(df[(df.HourDK >= '2022-05-15 00:00:00') & (df.HourDK <= '2022-05-16 23:00:
 # Ensure to evaluate on the same days as the other models
 # df.iloc[:-h+1]
 prob, x, b = DayAhead(df_within, b0, bmax, bmin_within, xmax, c_tilde, u_within, z_within, tvec_within)
-plot_EMPC(prob, 'Day-ahead Smart Charge', export=True)
+plot_EMPC(prob, 'Day-ahead Smart Charge', export=True, starttime=starttime, endtime=endtime)
 
 ### MultiDay
 prob, x, b = MultiDay(df, u, z, h, b0, bmax, bmin, xmax, c_tilde)
-plot_EMPC(prob, 'Multi-Day (Perfect Foresight) Smart Charge', export=True)
+plot_EMPC(prob, 'Multi-Day (Perfect Foresight) Smart Charge', export=True, starttime=starttime, endtime=endtime)
     # Perfect Foresight = MultiDay(h=inf)
     # Dumb Charge = MultiDay(h=0)
     # DayAhead = MultiDay(h=[12-36])

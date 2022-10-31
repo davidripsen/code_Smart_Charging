@@ -17,28 +17,45 @@ plot = False
 df = pd.read_csv('data/forecastsGreenerEl/prognoser.csv', sep=',', header=0, parse_dates=True)
 dfspot = pd.read_csv('data/spotprice/df_spot.csv', sep=',', header=0, parse_dates=True)
 
+# Convert from EUR/MWh to DKK/KWh
+eur_to_dkk = 7.44
+df['Price'] = eur_to_dkk * df['Price']/1000
+
 # Convert Atime and Time to datetime
 df['Atime'] = pd.to_datetime(df['Atime'], format='%Y-%m-%d %H:%M:%S')
 df['Time'] = pd.to_datetime(df['Time'], format='%Y-%m-%d %H:%M:%S')
 
+# Convert 'Price' to 'PredPrice'
+df['PredPrice'] = df['Price']
+df.drop(columns=['Price'], inplace=True)
+
 # Append true spot price to the dataframe
 dfspot = dfspot[dfspot['PriceArea'] == 'DK2']
-dfspot.rename(columns={'HourDK': 'Time', 'SpotPriceEUR':'TruePrice'}, inplace=True)
-dfspot.drop(columns=['PriceArea', 'SpotPriceDKK'], inplace=True)
+dfspot.rename(columns={'HourDK': 'Time', 'SpotPriceDKK':'TruePrice'}, inplace=True)
+dfspot.drop(columns=['PriceArea', 'SpotPriceEUR'], inplace=True)
+dfspot['TruePrice'] = dfspot['TruePrice']/1000 # Convert to kWh
 dfspot['Time'] = pd.to_datetime(dfspot['Time'], format='%Y-%m-%d %H:%M:%S')
 
-# Merge df and dfspot on Time
+# (!) Merge df and dfspot on Time (!)
 df = pd.merge(df, dfspot, on='Time', how='left')
+
+# Delete rows in dfspot where dfspot.Time is not in df.Time, reverse order and reset index - and export
+dfspot = dfspot[dfspot['Time'].isin(df['Time'])]
+dfspot = dfspot.iloc[::-1]
+dfspot.reset_index(drop=True, inplace=True)
+dfspot.to_csv('data/spotprice/df_spot_commontime.csv', index=False)
+endtime = dfspot['Time'].iloc[-1]
 del dfspot
 
 
 # Plot Price vs TruePrice using plotly
-import plotly.graph_objects as go
-fig = go.Figure()
-fig.add_trace(go.Scatter(x=df['Time'], y=df['Price'], mode='lines', name='Price'))
-fig.add_trace(go.Scatter(x=df['Time'], y=df['TruePrice'], mode='lines', name='TruePrice'))
-fig.update_layout(title='Price vs TruePrice', xaxis_title='Time', yaxis_title='Price')
-fig.show()
+if plot:
+    import plotly.graph_objects as go
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df['Time'], y=df['PredPrice'], mode='lines', name='PredPrice'))
+    fig.add_trace(go.Scatter(x=df['Time'], y=df['TruePrice'], mode='lines', name='TruePrice'))
+    fig.update_layout(title='Price vs TruePrice', xaxis_title='Time', yaxis_title='PredPrice')
+    fig.show()
 
 # For each unique Atime, plot the Price and TruePrice using matplotlib and save to pdf
 pdf = matplotlib.backends.backend_pdf.PdfPages("plots/RawPredictions_movie.pdf")
@@ -46,11 +63,11 @@ if plot: # Change to run=True for plotting
     for Atime in df['Atime'].unique():
         dfA = df[df['Atime'] == Atime]
         fig = plt.figure()
-        plt.plot(dfA['Time'], dfA['Price'], label='Price')
+        plt.plot(dfA['Time'], dfA['PredPrice'], label='PredPrice')
         plt.plot(dfA['Time'], dfA['TruePrice'], label='TruePrice')
         plt.title('Price vs TruePrice for Atime = ' + str(Atime))
         plt.xlabel('Time')
-        plt.ylabel('Price')
+        plt.ylabel('PredPrice')
         plt.legend()
         #fig.savefig('plots/plot_' + str(Atime) + '.pdf')
         pdf.savefig(fig)
@@ -60,7 +77,7 @@ if plot: # Change to run=True for plotting
 # For each unique Atime, print the Price and TruePrice
 for Atime in df['Atime'].unique():
     dfA = df[df['Atime'] == Atime]
-    print(dfA[['Atime', 'Time', 'Price', 'TruePrice']])
+    print(dfA[['Atime', 'Time', 'PredPrice', 'TruePrice']])
     print(' ')
 
 # Show prediction horizon at each Atime
@@ -72,10 +89,10 @@ minH = df['Atime'].value_counts().min()
 ##############################################################################
 # Change df into MPC-friendly format with constant timesteps
 ##############################################################################
-h = 168 # horizon: t = 0..h
-BigM = 25000  # BigM padding value for padding forecasts [EUR/MWh]
+h = 200 # horizon: t = 0..h
+BigM = int(25000)  # BigM padding value for padding forecasts [EUR/MWh]
 
-def SliceDataFrame(df, h, var='Price', use_known_prices=False, dftrue=None, BigM=20000):
+def SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=None, BigM=20000):
     # Create dataframe with Price as values from df and where Time is split into columns from 0 to 100 and Atime as rows
     if var=='TruePrice': # Ensure for that residuals outside of horizon(forecasts) have a super high residual, not 0.
         BigM = BigM*2
@@ -86,13 +103,12 @@ def SliceDataFrame(df, h, var='Price', use_known_prices=False, dftrue=None, BigM
             vals = df[df['Atime'] == Atime][var].values
             # Pad vals until length h+1 with BigM
             vals = np.pad(vals, (0, np.max([0, h+1 - len(vals)+1]) ), 'constant', constant_values=BigM)
-            
-            #    
             df2.loc[df2['Atime'] == Atime, 't' + str(i)] = vals[i]
 
     # Calculate number of hours until next Atime
     df2['Atime_next'] = df2['Atime'].shift(-1)
     df2['Atime_next'] = df2['Atime_next'].fillna(df2['Atime'].iloc[-1])
+    df2['Atime_next'].iloc[-1] = endtime+pd.Timedelta(hours=1)
     diff = pd.Series((pd.Series(df2['Atime_next']).dt.ceil('H') - pd.Series(df2['Atime']).dt.ceil('H'))).dt
     df2.insert(1, 'Atime_diff', (diff.days * 24 + diff.seconds/3600).astype(int))
     df2.drop(columns=['Atime_next'], inplace=True)
@@ -109,7 +125,7 @@ def SliceDataFrame(df, h, var='Price', use_known_prices=False, dftrue=None, BigM
 
     return df2
 dft = SliceDataFrame(df, h, var='TruePrice', BigM=BigM) #df with TruePrice as values
-dfp = SliceDataFrame(df, h, var='Price', use_known_prices=True, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
+dfp = SliceDataFrame(df, h, var='PredPrice', use_known_prices=True, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
 
 # Export to csv
 dft.to_csv('data/MPC-ready/df_trueprices_for_mpc.csv', index=False)
