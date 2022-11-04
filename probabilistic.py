@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import datetime as dt
+plot=False
 
 # Read the dfp and dft
 dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
@@ -24,15 +25,130 @@ dfr = dft - dfp
 dfr['Atime'] = dfp['Atime']
 dfr['Atime_diff'] = dfp['Atime_diff']
 
-# Make beautiful matplotlib histograms of the residuals for each time step and save them all in one pdf
-steps = dfr.columns[2:]
+# Replace BigM with nan
+BigM = dfr.max().iloc[-1] # 25000
+dfr = dfr.replace(BigM, np.nan)
 
-pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Histograms_of_residuals_per_timestep.pdf")
-for step in steps:
-    fig = plt.figure()
-    plt.hist(dfr[step], bins=50)
-    plt.title('Histogram of residuals for timestep ' + str(step))
-    plt.xlabel('Residual')
-    plt.ylabel('Count')
-    pdf.savefig(fig)
-pdf.close()
+# Make beautiful matplotlib histograms of the residuals for each time step and save them all in one pdf
+maxstep = 152
+steps = dfr.columns[2:(2+maxstep)]
+
+if plot:
+    pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Histograms_of_residuals_per_timestep.pdf")
+    for step in steps:
+        fig = plt.figure()
+        plt.hist(dfr[step][~np.isnan(dfr[step])], bins=50, density=True)
+        nans = np.isnan(dfr[step])
+        plt.title('Histogram of residuals for timestep '+ str(step) +'         (nans:'+ str(np.sum(nans))+' / '+str(len(dfr))+')')
+        plt.axvline(x=0, color='r', linestyle='--')
+        
+        # Plot Gaussian fit of the histogram data
+        mu, std = np.mean(dfr[step][~np.isnan(dfr[step])]), np.std(dfr[step][~np.isnan(dfr[step])])
+        if std != 0:
+            xmin, xmax = plt.xlim()
+            x = np.linspace(xmin, xmax, 100)
+            p = 1/(std * np.sqrt(2 * np.pi)) * np.exp( - (x - mu)**2 / (2 * std**2) )
+            plt.plot(x, p, 'k', linewidth=1, linestyle='--')
+
+        plt.xlabel('Residual')
+        plt.ylabel('Densiy')
+        #plt.show()
+        pdf.savefig(fig)
+    pdf.close()
+
+### Fit multivariate normal distribution to the residuals
+
+# ##### Calculate mean and covariance matrix
+# from sklearn.covariance import ShrunkCovariance
+# from sklearn.covariance import LedoitWolf
+# from sklearn.covariance import OAS
+# from sklearn.covariance import MinCovDet
+# from sklearn.covariance import GraphicalLasso
+# from sklearn.covariance import GraphicalLassoCV
+# from sklearn.covariance import EmpiricalCovariance
+# from sklearn.covariance import EllipticEnvelope
+# from sklearn.covariance import ledoit_wolf
+# from sklearn.covariance import oas
+# from sklearn.covariance import empirical_covariance
+# from sklearn.covariance import shrunk_covariance
+# from sklearn.covariance import min_cov_det
+# from sklearn.covariance import graphical_lasso
+# from sklearn.covariance import graphical_lasso_path
+# from sklearn.covariance import graphical_lasso_cv
+
+# # Calculate mean and covariance matrix
+# cov = MinCovDet().fit(df)
+# cov = GraphicalLassoCV().fit(df)
+# cov = GraphicalLasso().fit(df)
+# cov = LedoitWolf().fit(df)
+# cov = OAS().fit(df)
+# cov = ShrunkCovariance().fit(df)
+# cov = EmpiricalCovariance().fit(df)
+# cov = EllipticEnvelope().fit(df)
+# cov = ledoit_wolf(df)
+# cov = oas(df)
+# cov = empirical_covariance(df)
+# cov = shrunk_covariance(df)
+# cov = min_cov_det(df)
+# cov = graphical_lasso(df)
+# cov = graphical_lasso_path(df)
+# cov = graphical_lasso_cv(df)
+
+# In the small-samples situation, in which n_samples is on the order of n_features or smaller, sparse inverse covariance estimators tend to work better than shrunk covariance estimators.
+# However, in the opposite situation, or for very correlated data, they can be numerically unstable. In addition, unlike shrinkage estimators, sparse estimators are able to recover off-diagonal structure.
+# https://scikit-learn.org/stable/modules/covariance.html
+
+# Drop all columns with nan
+df = dfr.iloc[:,2:maxstep+2].to_numpy()
+mu = dfr.iloc[:,2:maxstep+2].mean(numeric_only=True)
+#cov = ShrunkCovariance(shrinkage=0.1).fit(df).covariance_
+#cov = np.cov(df, rowvar=False)
+cov = dfr.iloc[:,2:maxstep+2].cov()
+    # "the sample covariance matrix was singular which can happen from exactly collinearity (as you've said) or when the number of observations is less than the number of variables."
+
+# Visualise mu (and therefore bias)
+if plot:
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=mu.index, y=mu.values, mode='lines+markers', name='Mean'))
+    fig.update_layout(title='Mean of the residuals per timestep', xaxis_title='Timestep', yaxis_title='Mean')
+    fig.write_html("plots/Mean_of_residuals_per_timestep.html")
+    fig.show()
+
+# Visualise covariance matrix
+if plot:
+    fig = go.Figure(data=go.Heatmap(
+            z=cov,
+            x=np.arange(maxstep),#cov.columns,
+            y=np.arange(maxstep),#cov.columns,
+            colorscale='Viridis'))
+    fig.update_layout(title='Covariance matrix of residuals')
+    fig.show()
+    fig.write_html("plots/Covariance_matrix_of_residuals.html")
+
+
+# Generate 100 samples from the multivariate normal distribution
+samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 100)
+print(samples.shape)
+
+# Visualise the time series of the samples and add 95 % prediction interval
+if plot:
+    fig = go.Figure()
+    # Add theoretical mean
+    fig.add_trace(go.Scatter(x=mu.index, y=mu.values, mode='lines', name='Mean of distribution', line=dict(color='black', width=1)))
+    # Add 95% confidence interval
+    fig.add_trace(go.Scatter(x=mu.index, y=mu.values+1.96*np.sqrt(np.diag(cov)), mode='lines', name='95% confidence intervals (Wald)', line=dict(width=1, color='red')))
+    fig.add_trace(go.Scatter(x=mu.index, y=mu.values-1.96*np.sqrt(np.diag(cov)), mode='lines', name='', line=dict(width=1, color='red')))
+    # Calculate emperical 95 % quantiles from samples
+    quantiles = np.quantile(samples, [0.025, 0.975], axis=0)
+    fig.add_trace(go.Scatter(x=mu.index, y=quantiles[0,:], mode='lines', name='95% quantiles of samples', line=dict(width=1, color='red', dash='dash')))
+    fig.add_trace(go.Scatter(x=mu.index, y=quantiles[1,:], mode='lines', name='', line=dict(width=1, color='red', dash='dash')))
+    for i in range(0,100):
+        fig.add_trace(go.Scatter
+            (x=mu.index, y=samples[i,:], mode='lines', name='Sample '+str(i), line=dict(width=0.5, color='gray')))
+    fig.update_layout(title='Samples from the multivariate normal distribution', xaxis_title='Timestep', yaxis_title='Residual')
+    fig.show()
+    fig.write_html("plots/Samples_from_multivariate_normal_distribution.html")
+
+    # = Prediction interval (under correct model assumption)
+
+

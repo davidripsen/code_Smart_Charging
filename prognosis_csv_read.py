@@ -11,6 +11,8 @@ import json
 import plotly.express as px
 from matplotlib import pyplot as plt
 import matplotlib.backends.backend_pdf
+import seaborn as sns
+sns.set_theme()
 plot = False
 
 # Read the csv files
@@ -41,11 +43,18 @@ df = pd.merge(df, dfspot, on='Time', how='left')
 
 # Delete rows in dfspot where dfspot.Time is not in df.Time, reverse order and reset index - and export
 dfspot = dfspot[dfspot['Time'].isin(df['Time'])]
+    # For the sake of Day-Ahead Smart Charge, ensure that dfspot is not much longer than df.Atime
+endday = df.Atime.iloc[-1].date() + pd.Timedelta(days=2)
+    # cut off dfspot at endday
+dfspot = dfspot[dfspot['Time'] < pd.to_datetime(endday)]
 dfspot = dfspot.iloc[::-1]
 dfspot.reset_index(drop=True, inplace=True)
 dfspot.to_csv('data/spotprice/df_spot_commontime.csv', index=False)
 endtime = dfspot['Time'].iloc[-1]
 del dfspot
+
+
+
 
 
 # Plot Price vs TruePrice using plotly
@@ -82,6 +91,14 @@ for Atime in df['Atime'].unique():
 
 # Show prediction horizon at each Atime
 print(df['Atime'].value_counts().to_string())
+
+# Plot beautiful histogram of prediction horizon and export plot
+if plot:
+    fig = px.histogram(df, x='Atime')
+    fig.update_layout(title='Prediction horizon (h) for forecast made at different (A)times', xaxis_title='Atime', yaxis_title='Count')
+    fig.show()
+    fig.write_image("plots/PredictionHorizons.png")
+
     # Hor = 101-200 hours (min. 4 day, consider 5 days and fill some steps)
 minH = df['Atime'].value_counts().min()
 
@@ -127,9 +144,24 @@ def SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=None, 
 dft = SliceDataFrame(df, h, var='TruePrice', BigM=BigM) #df with TruePrice as values
 dfp = SliceDataFrame(df, h, var='PredPrice', use_known_prices=True, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
 
+# df with only known prices, for imput to Day-Ahead Smart Charge
+dfk = pd.DataFrame(columns=['Atime'] + ['t' + str(i) for i in range(0,h+1)])
+dfk['Atime'] = df['Atime'].unique()
+wellknownhours = 48 - (dfk['Atime'].dt.hour + 1)
+dfk['Atime_next'] = dfk['Atime'].shift(-1)
+dfk['Atime_next'].iloc[-1] = endtime+pd.Timedelta(hours=1)
+diff = pd.Series((pd.Series(dfk['Atime_next']).dt.ceil('H') - pd.Series(dfk['Atime']).dt.ceil('H'))).dt
+dfk.insert(1, 'Atime_diff', (diff.days * 24 + diff.seconds/3600).astype(int))
+dfk.drop(columns=['Atime_next'], inplace=True)
+for j, wk in enumerate(wellknownhours):
+    for i in range(0, wk):
+        dfk.loc[j, 't' + str(i)] = dft.loc[j, 't' + str(i)]
+dfk.fillna(BigM, inplace=True)
+
 # Export to csv
 dft.to_csv('data/MPC-ready/df_trueprices_for_mpc.csv', index=False)
 dfp.to_csv('data/MPC-ready/df_predprices_for_mpc.csv', index=False)
+dfk.to_csv('data/MPC-ready/df_knownprices_for_mpc.csv', index=False)
 
 # For each Atime plot the Predicted Price (dfp) and TruePrice (dft) throughout the horizon
 pdf = matplotlib.backends.backend_pdf.PdfPages("plots/ModPredictions_movie.pdf")

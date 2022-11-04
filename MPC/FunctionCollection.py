@@ -69,3 +69,45 @@ def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, starttime='
     ## Export figure
     if export:
         fig.write_html( "plots/MPC/" + name + "_mpc.html")
+
+def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
+    # Init problem
+    prob = LpProblem("mpc1", LpMinimize)
+
+    # Init variables
+    global x
+    global b
+    x = LpVariable.dicts("x", tvec, lowBound=0, upBound=xmax, cat='Continuous')
+    b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=bmax, cat='Continuous')
+    i = LpVariable.dicts("i", tvec, lowBound=0, upBound=1, cat='Binary')
+    b[0] = b0
+    M = 10**6
+
+    # Objective
+    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * (b[T+1]-b[0]))
+
+    # Constraints
+    for t in tvec:
+        prob += b[t+1] == b[t] + x[t] - u[t]
+        prob += b[t+1] >= bmin[t+1]
+        prob += b[t+1] <= bmax
+        
+        ######## DUMB CHARGE ########
+        ### Implement in OR-terms: x[t] == min(z[t]*xmax, bmax-b[t])
+        #######
+        # Ensure i[t] == 1, if z[t]*xmax < bmax-b[t] (dvs. i=1 når der er rigeligt plads på batteriet)
+        prob += bmax-b[t] - z[t]*xmax  - M*i[t] <= 0
+        prob += z[t]*xmax - bmax+b[t] - M*(1-i[t]) <= 0
+
+        # Use i[t] to constraint x[t]
+        prob += x[t] <= z[t]*xmax
+        prob += x[t] <= bmax-b[t]
+        prob += x[t] >= (z[t]*xmax - M*(1-i[t])) # i = 1 betyder, at der lades max kapacitet
+        prob += x[t] >= (bmax-b[t] - M*i[t])     # i = 0 betyder, at vi kun kan lade de resterende til 100 % SOC
+        #prob += i[t] <= z[t]
+
+    # Solve problem
+    prob.solve()
+
+    # Return results
+    return(prob, x, b)
