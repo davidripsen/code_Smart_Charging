@@ -99,7 +99,7 @@ def MultiDay(dfp, dfspot, u, z, h, b0, bmax, bmin, xmax, c_tilde):
 
     # Tie results intro prob
     prob = {'x':X, 'b':B, 'u':u[0:L], 'c':dfspot['TruePrice'][0:L], 'objective':total_cost}
-    return(prob, x, b)
+    return(prob, x, b)“
 
 ### Run the problem
 h = 5*24 # 5 days horizon for the multi-day smart charge
@@ -107,7 +107,7 @@ prob, x, b = MultiDay(dfp, dfspot, u, z, h, b0, bmax, bmin, xmax, c_tilde)
 plot_EMPC(prob, 'Multi-Day Smart Charge (h = '+str(int(h/24))+'days)', starttime=starttime, endtime=endtime, export=True)
 
 if runMany:
-    for h in range(1,7):
+    for h in range(1,6):
         print("h = " + str(h))
         prob, x, b = MultiDay(dfp, dfspot, u, z, h*24, b0, bmax, bmin, xmax, c_tilde)
         plot_EMPC(prob, 'Multi-Day Smart Charge (h = '+str(h)+' days)', starttime=starttime, endtime=endtime, export=True)
@@ -119,10 +119,10 @@ if runMany:
 #prob, x, b = MultiDay(dfp, dfspot, u, z, h2, b0, bmax, bmin, xmax, c_tilde0)
 #plot_EMPC(prob, 'Dumb Charge', starttime=starttime, endtime=endtime, export=False)
 
-### Day-Ahead SmartCharge
-h3=36; c_tilde0=0;
-prob, x, b = MultiDay(dfk, dfspot, u, z, h3, b0, bmax, bmin, xmax, c_tilde0)
-plot_EMPC(prob, 'Day-Ahead Smart Charge', starttime=starttime, endtime=endtime, export=False)
+#### Day-Ahead SmartCharge
+#h3=36; c_tilde0=0;
+#prob, x, b = MultiDay(dfk, dfspot, u, z, h3, b0, bmax, bmin, xmax, c_tilde0)
+#plot_EMPC(prob, 'Day-Ahead Smart Charge', starttime=starttime, endtime=endtime, export=False)
 
 ### Perfect Foresight
     # Compare models on the data within horizon
