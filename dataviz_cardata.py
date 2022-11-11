@@ -10,10 +10,19 @@ import matplotlib.pyplot as plt
 import datetime as dt
 import plotly.graph_objects as go
 import json
+import datetime
+pd.set_option('display.max_rows', 500)
 
 # Read EV user data
 df = pd.read_csv('data/Monta/2022_11_03 10_15.csv', sep=',', header=0, parse_dates=True) # All charges
 df2 = pd.read_csv('data/Monta/charge_smart_charges.csv', sep=',', header=0, parse_dates=True) # Smart Charges.    Can be mapped to All Charges on df2.id == df.Smart_Charge_ID
+df_vis = pd.read_excel('data/Monta/core.core_charges.xlsx')
+dfA1 = pd.read_csv('data/Monta/charges_part1.csv', sep=',', header=0, parse_dates=True, low_memory=False)
+dfA2 = pd.read_csv('data/Monta/charges_part2.csv', sep=',', header=0, parse_dates=True, low_memory=False)
+dfA3 = pd.read_csv('data/Monta/charges_part3.csv', sep=',', header=0, parse_dates=True, low_memory=False)
+# A2, A1, A3
+df3 = pd.concat([dfA1, dfA2, dfA3], ignore_index=True)
+
 
 # Convert to datetime
 timevars = ['CABLE_PLUGGED_IN_AT', 'RELEASED_AT', 'STARTING_AT', 'COMPLETED_AT', 'CHARGE_TIME']
@@ -33,6 +42,17 @@ df.iloc[5]
 df2
 print("Columns: ", df2.columns)
 df2.iloc[43]
+
+##### Join df and df2 where df2.id == df.SMART_CHARGE_ID
+    #df2.id.isin(df.SMART_CHARGE_ID).mean() # The majority of Smart Charges are also in df (All Charges)
+D = df2.merge(df, left_on='id', right_on='SMART_CHARGE_ID', how='left')
+D = D.dropna(subset=['CABLE_PLUGGED_IN_AT'])
+D
+
+# Show df3
+df3
+df3.iloc[44]
+# Hmmm... Plug-in og plug-out are only dates, not times :-(
 
 
 ###################################################################################
@@ -109,7 +129,7 @@ plot_diurnal_weekly_plugtimes(df, 'RELEASED_AT', "Diurnal-weekly pattern of RELE
 fig = go.Figure(data=[go.Histogram(x=df['KWH'])])
 fig.update_layout(
     title_text="Histogram of KWH", # title of plot
-    xaxis_title_text='KWH', # xaxis label
+    xaxis_title_text='KWH', # xaxisDabel
     yaxis_title_text='Counts', # yaxis label
     bargap=0.2, # gap between bars of adjacent location coordinates
     bargroupgap=0.1 # gap between bars of the same location coordinates
@@ -124,9 +144,9 @@ plt.show()
 
 
 
-###################################################################################
-########### NOW BACK TO df2  ########################################################
-###################################################################################
+####################################################################################
+########### NOW BACK TO df2  #######################################################
+####################################################################################
 # NO unique USER_ID in df2
 # only unique transaction id
 print("Number of different transactions: ", df2['id'].unique().size)  
@@ -176,17 +196,14 @@ eval(df2.iloc[43].result)
 
 
 
+###################################################################################
+########### NOW BACK TO D  ########################################################
+###################################################################################
 
-
-
-##### Join df and df2 where df2.id == df.SMART_CHARGE_ID
-#df2.id.isin(df.SMART_CHARGE_ID).mean() # The majority of Smart Charges are also in df (All Charges)
-D = df2.merge(df, left_on='id', right_on='SMART_CHARGE_ID', how='left')
-D = D.dropna(subset=['CABLE_PLUGGED_IN_AT'])
-
-##### Let's examine a particular session
-i = 3043 # i=43
+######## Let's examine a particular session #######################################
+i = 3543 # i=43
 sesh = D.iloc[i]
+sesh
     # Plugged in at 02:04 and plugged-out at 12:08
     # Charged from 02:09 to 04:00
     # Charged 11 kWh at a maximum capacity of 11 kW (not possible within two hours)
@@ -199,13 +216,51 @@ xt
 print("kWh charged:  ", sum(xt))
 prices = pd.DataFrame(eval(sesh.prices))
 # Confirming total price:
-#prices['value'].dot(xt)
+prices['value'].dot(xt)
 
 # Hmmm.... result and df doesn't match
 print("kWH  from df: ", sesh['KWH'], "kWh", " vs. ", "from df2: ", eval(sesh.result)['periods'][0]['kwh'] + eval(sesh.result)['periods'][1]['kwh'], "kWh")
 print("CO2  from df: ", sesh['CO2'], "kg", " vs. ", "from df2: ", eval(sesh.result)['cost']['total_co2'], "kg")
 
-sesh
+
+
+###### Let's examine a particular user ############################################
+user = 43456
+# For the specific user, plot 'KWH' vs. 'CABLE_PLUGGED_IN_AT' using plotly
+D_user = D[D['USER_ID'] == user]
+D_user = D_user.sort_values(by=['CABLE_PLUGGED_IN_AT'])
+
+firsttime = D_user['CABLE_PLUGGED_IN_AT'].min()
+lasttime = D_user['RELEASED_AT'].max()
+
+fig = go.Figure(data=[go.Scatter(
+    x=D_user['RELEASED_AT'],
+    y=D_user['KWH'],
+    mode='lines+markers',
+    marker=dict(
+        size=10,
+        opacity=0.8
+    )
+)])
+# Set xticks to be individual days
+fig.update_xaxes(
+    tickmode = 'array',
+    tickvals = [firsttime + datetime.timedelta(days=i) for i in range((lasttime-firsttime).days+1)],
+    ticktext = [str(firsttime + datetime.timedelta(days=i))[:10] for i in range((lasttime-firsttime).days+1)],
+    tickangle = 45
+) 
+fig.update_layout(
+    title_text="Charging by user " + str(user) + "               from "+str(firsttime.date())+" to "+str(lasttime.date()), # title of plot
+    xaxis_title_text="Date", # xaxis label
+    yaxis_title_text="KWH", # yaxis label
+    legend_title="Legend Title", # title for legend
+    #font=dict(
+    #    size=18,
+    #    color="RebeccaPurple"
+    #)
+)
+fig.show()
+
 
 ########################### About the data ##########################################
 ##### What do we have:-)
@@ -222,3 +277,9 @@ sesh
 # Questions about to data:
 # 1. UTC?
 # 2. stop_time
+
+##### Other comments
+# - regard Charge-file. Smart_Charge-file corresponds to PLANNED SmartCharge. Often PLUGGED-OUT much before.
+# - awaiting new df
+# - awaiting new forecasts
+# - until then: 

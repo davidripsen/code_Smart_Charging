@@ -99,7 +99,7 @@ def MultiDay(dfp, dfspot, u, z, h, b0, bmax, bmin, xmax, c_tilde):
 
     # Tie results intro prob
     prob = {'x':X, 'b':B, 'u':u[0:L], 'c':dfspot['TruePrice'][0:L], 'objective':total_cost}
-    return(prob, x, b)“
+    return(prob, x, b)
 
 ### Run the problem
 h = 5*24 # 5 days horizon for the multi-day smart charge
