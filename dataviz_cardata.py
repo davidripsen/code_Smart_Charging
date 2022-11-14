@@ -17,11 +17,11 @@ pd.set_option('display.max_rows', 500)
 df = pd.read_csv('data/Monta/2022_11_03 10_15.csv', sep=',', header=0, parse_dates=True) # All charges
 df2 = pd.read_csv('data/Monta/charge_smart_charges.csv', sep=',', header=0, parse_dates=True) # Smart Charges.    Can be mapped to All Charges on df2.id == df.Smart_Charge_ID
 df_vis = pd.read_excel('data/Monta/core.core_charges.xlsx')
-dfA1 = pd.read_csv('data/Monta/charges_part1.csv', sep=',', header=0, parse_dates=True, low_memory=False)
-dfA2 = pd.read_csv('data/Monta/charges_part2.csv', sep=',', header=0, parse_dates=True, low_memory=False)
-dfA3 = pd.read_csv('data/Monta/charges_part3.csv', sep=',', header=0, parse_dates=True, low_memory=False)
+#dfA1 = pd.read_csv('data/Monta/charges_part1.csv', sep=',', header=0, parse_dates=True, low_memory=False)
+#dfA2 = pd.read_csv('data/Monta/charges_part2.csv', sep=',', header=0, parse_dates=True, low_memory=False)
+#dfA3 = pd.read_csv('data/Monta/charges_part3.csv', sep=',', header=0, parse_dates=True, low_memory=False)
 # A2, A1, A3
-df3 = pd.concat([dfA1, dfA2, dfA3], ignore_index=True)
+#df3 = pd.concat([dfA1, dfA2, dfA3], ignore_index=True)
 
 
 # Convert to datetime

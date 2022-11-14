@@ -6,7 +6,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, verbose=True):
-        # Init problem
+        # Init problem 
     prob = LpProblem("mpc1", LpMinimize)
 
     # Init variabless
