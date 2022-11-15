@@ -282,4 +282,4 @@ fig.show()
 # - regard Charge-file. Smart_Charge-file corresponds to PLANNED SmartCharge. Often PLUGGED-OUT much before.
 # - awaiting new df
 # - awaiting new forecasts
-# - until then: 
+# - until then:
