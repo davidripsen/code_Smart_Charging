@@ -13,27 +13,71 @@ from matplotlib import pyplot as plt
 import matplotlib.backends.backend_pdf
 import seaborn as sns
 sns.set_theme()
-plot = False
+pd.set_option('display.max_rows', 500)
+plot = True
+use_carnot = True
 
 # Read the csv files
 df = pd.read_csv('data/forecastsGreenerEl/prognoser.csv', sep=',', header=0, parse_dates=True)
-dfspot = pd.read_csv('data/spotprice/df_spot.csv', sep=',', header=0, parse_dates=True)
+dfspot = pd.read_csv('data/spotprice/df_spot_since_sept22_HourDK.csv', sep=',', header=0, parse_dates=True)
+dfc = pd.read_csv('data/forecastsCarnot/carnot_forecasts.csv', sep=',', header=0, parse_dates=True)
 
-# Convert from EUR/MWh to DKK/KWh
-eur_to_dkk = 7.44
-df['Price'] = eur_to_dkk * df['Price']/1000
+
+if use_carnot:
+    #dfc = dfc[(dfc['SOURCE'] == 'carnot') & (dfc['COUNTRY_AREA_CODE'] == 'DK2')]
+    dfc = dfc[(dfc['COUNTRY_AREA_CODE'] == 'DK2')]
+    # Make new df with chosen columns
+    df = pd.DataFrame({'Atime': dfc.CREATED_AT, 'Time': dfc.TIME_START, 'PredPrice': dfc.FORECAST_PRICE_KWH, 'TruePrice_Carnot': dfc.PRICE_KWH})
+
+
+
+    df.Atime.value_counts().hist()
+    plt.title('Distribution of forecasts lengths (DK2)')
+    plt.show()
+    Atimes = df.Atime.unique()
+
+    # Convert Atime and Time to datetime
+    df['Atime'] = pd.to_datetime(df['Atime'], format='%Y-%m-%d %H:%M:%S')
+    df['Time'] = pd.to_datetime(df['Time'], format='%Y-%m-%d %H:%M:%S')
+
+
+    # Plot a timeseries for Atime[44] using plotly
+    i = 23
+    fig = px.line(df[df['Atime'] == Atimes[i]], x='Time', y='PredPrice', title='Carnot forecast for Atime number '+ str(i))
+    fig.update_xaxes(rangeslider_visible=True)
+    fig.show()
+
+    for atime in Atimes[400:450]:
+        # Print all forecasts for Atime
+        print(df[df['Atime'] == atime])
+
+
+    # Subset df for dev (DELETE!!!!!)
+    df = df[:100]
+
+
+    del dfc
+
+
+
+
+
+if not use_carnot:
+    # Convert from EUR/MWh to DKK/KWh
+    eur_to_dkk = 7.44
+    df['Price'] = eur_to_dkk * df['Price']/1000
+
+    # Convert 'Price' to 'PredPrice'
+    df['PredPrice'] = df['Price']
+    df.drop(columns=['Price'], inplace=True)
 
 # Convert Atime and Time to datetime
 df['Atime'] = pd.to_datetime(df['Atime'], format='%Y-%m-%d %H:%M:%S')
 df['Time'] = pd.to_datetime(df['Time'], format='%Y-%m-%d %H:%M:%S')
 
-# Convert 'Price' to 'PredPrice'
-df['PredPrice'] = df['Price']
-df.drop(columns=['Price'], inplace=True)
-
 # Append true spot price to the dataframe
 dfspot = dfspot[dfspot['PriceArea'] == 'DK2']
-dfspot.rename(columns={'HourDK': 'Time', 'SpotPriceDKK':'TruePrice'}, inplace=True)
+dfspot.rename(columns={'HourUTC': 'Time', 'SpotPriceDKK':'TruePrice'}, inplace=True)
 dfspot.drop(columns=['PriceArea', 'SpotPriceEUR'], inplace=True)
 dfspot['TruePrice'] = dfspot['TruePrice']/1000 # Convert to kWh
 dfspot['Time'] = pd.to_datetime(dfspot['Time'], format='%Y-%m-%d %H:%M:%S')
@@ -55,8 +99,6 @@ del dfspot
 
 
 
-
-
 # Plot Price vs TruePrice using plotly
 if plot:
     import plotly.graph_objects as go
@@ -67,7 +109,7 @@ if plot:
     fig.show()
 
 # For each unique Atime, plot the Price and TruePrice using matplotlib and save to pdf
-pdf = matplotlib.backends.backend_pdf.PdfPages("plots/RawPredictions_movie.pdf")
+pdf = matplotlib.backends.backend_pdf.PdfPages("plots/RawPredictions_movie_CARNOT="+str(use_carnot)+".pdf")
 if plot: # Change to run=True for plotting
     for Atime in df['Atime'].unique():
         dfA = df[df['Atime'] == Atime]
@@ -97,7 +139,7 @@ if plot:
     fig = px.histogram(df, x='Atime')
     fig.update_layout(title='Prediction horizon (h) for forecast made at different (A)times', xaxis_title='Atime', yaxis_title='Count')
     fig.show()
-    fig.write_image("plots/PredictionHorizons.png")
+    fig.write_image("plots/PredictionHorizonsCarnot="+str(use_carnot)+".png")
 
     # Hor = 101-200 hours (min. 4 day, consider 5 days and fill some steps)
 minH = df['Atime'].value_counts().min()
@@ -164,19 +206,20 @@ dfp.to_csv('data/MPC-ready/df_predprices_for_mpc.csv', index=False)
 dfk.to_csv('data/MPC-ready/df_knownprices_for_mpc.csv', index=False)
 
 # For each Atime plot the Predicted Price (dfp) and TruePrice (dft) throughout the horizon
-pdf = matplotlib.backends.backend_pdf.PdfPages("plots/ModPredictions_movie.pdf")
-if plot: # Change to run=True for plotting
-    for i, Atime in enumerate(dfp['Atime']):
-        fig = plt.figure()
-        plt.plot(np.arange(0,h+1), dfp.iloc[i,2:(2+minH+1)], label='PredictedPrice')
-        plt.plot(np.arange(0,h+1), dft.iloc[i,2:(2+minH+1)], label='TruePrice', linestyle='-.', color='black')
-        plt.title('PredictedPrice vs TruePrice for Atime = ' + str(Atime))
-        plt.xlabel('Time [h]')
-        plt.ylabel('Price [EUR/MWh]')
-        plt.legend()
-        #fig.savefig('plots/PredMovie2/PredictedPrice_' + str(Atime) + '.pdf')
-        pdf.savefig(fig)
-    pdf.close()
+if not use_carnot:
+    pdf = matplotlib.backends.backend_pdf.PdfPages("plots/ModPredictions_movie_Carnot="+str(use_carnot)+".pdf")
+    if plot: # Change to run=True for plotting
+        for i, Atime in enumerate(dfp['Atime']):
+            fig = plt.figure()
+            plt.plot(np.arange(0,h+1), dfp.iloc[i,2:(2+minH+1)], label='PredictedPrice')
+            plt.plot(np.arange(0,h+1), dft.iloc[i,2:(2+minH+1)], label='TruePrice', linestyle='-.', color='black')
+            plt.title('PredictedPrice vs TruePrice for Atime = ' + str(Atime))
+            plt.xlabel('Time [h]')
+            plt.ylabel('Price [EUR/MWh]')
+            plt.legend()
+            #fig.savefig('plots/PredMovie2/PredictedPrice_' + str(Atime) + '.pdf')
+            pdf.savefig(fig)
+        pdf.close()
 
 
 ##############################################################################  

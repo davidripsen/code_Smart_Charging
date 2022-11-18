@@ -22,7 +22,7 @@ dfC2 = pd.read_csv('data/Monta/charges_extract_2.csv', header=0, parse_dates=Tru
 dfC3 = pd.read_csv('data/Monta/charges_extract_3.csv', header=0, parse_dates=True, low_memory=False)
 spot = pd.read_csv('data/spotprice/df_spot_since_sept22.csv')
 D = pd.concat([dfC1, dfC2, dfC3], ignore_index=True)
-del dfC1, dfC2, dfC3
+#del dfC1, dfC2, dfC3
 
 # Join dfB and D on dfb['id'] = D['vehicle_id']
 D = D.merge(dfB, left_on='VEHICLE_ID', right_on=dfB.index, how='left')
@@ -52,8 +52,6 @@ print("Disregarding ", round((1-(len(D2)/len(D))),4) *100, " % of the data where
 i = 2000
 
 sesh = D2.iloc[i]
-sesh
-
 eval(sesh.KWHS)
 
 sesh.KWHS
@@ -79,7 +77,8 @@ print("Number of different smart chard IDs:  ", D2.SMART_CHARGE_ID.unique().shap
 
 ############# Let's extract a single VEHICLE profile ########################################
 vehicle_ids = D2.VEHICLE_ID.unique()
-def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False):
+var = 'VEHICLE_ID'
+def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df_only=False):
     D2v = D2[D2[var] == id]
     D2v = D2v.sort_values(by=['CABLE_PLUGGED_IN_AT'])
     id = int(id)
@@ -125,8 +124,12 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False):
     # Loop over all plug-ins and plug-outs     # ADD KWH AND SOC RELATIVE TO TIMES
     for i in range(len(D2v)):
         # Set z=1 for all times from plug-in to plug-out
-        df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['PLANNED_PICKUP_AT'], 'z_plan'] = 1
+        df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['PLANNED_PICKUP_AT'], 'z_plan'] = 1 #i=2, ser ud til at være fucked, når CABLE_PLUGGED_IN_AT IKKE er heltal.
         df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['RELEASED_AT'], 'z_act'] = 1
+
+        # Allow semi-discrete plug-in relative to proportion of the hour
+        #df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'], 'z_plan'] = 1
+
         # Extract charge from 'KWHS' and add to df where time is the same
         xt = pd.DataFrame(eval(D2v.iloc[i]['KWHS']))
         if D2v.iloc[i]['KWH'] != round(xt.sum()[1],4):
@@ -137,7 +140,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False):
         df.loc[xt.index, 'charge'] = xt['value']
 
         # Add the right spot prices to df
-        if type(D2v.iloc[i]['SPOT_PRICES']) == str:
+        if type(D2v.iloc[i]['SPOT_PRICES']) == str and len(eval(D2v.iloc[i]['SPOT_PRICES'])) != 0:
             prices = pd.DataFrame(eval(D2v.iloc[i]['SPOT_PRICES']))
             prices['time'] = pd.to_datetime(prices['time'])
             prices['time'] = prices['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
@@ -145,19 +148,24 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False):
             df.loc[prices.index, 'price'] = prices['value']
         
         # Add SOC and convert to kWhs
-        if show_SOC:
-            df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'].ceil('H'), 'SOC'] = D2v.iloc[i]['SOC_START']/100 * D2v.iloc[i]['capacity_kwh']
-            df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOC'] = D2v.iloc[i]['SOC']/100 * D2v.iloc[i]['capacity_kwh']
+        df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'].ceil('H'), 'SOC'] = D2v.iloc[i]['SOC_START']/100 * D2v.iloc[i]['capacity_kwh']
+        df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOC'] = D2v.iloc[i]['SOC']/100 * D2v.iloc[i]['capacity_kwh']
 
     df['costs'] = df['price'] * df['charge']
 
     df = df.merge(df_spot, how='left', left_on='time', right_on='time')
     df['BatteryCapacity'] = D2v.iloc[i]['capacity_kwh']
-    df['CableCapacity'] = D2v.iloc[i]['max_kw_dc']
+    df['CableCapacity'] = D2v.iloc[i]['max_kw_ac']
     
     # in df['SOC] replace nan with most recent value
+    df['SOC_lin'] = df['SOC'].interpolate(method='linear')
     df['SOC'] = df['SOC'].fillna(method='ffill')
 
+    # Use
+    u = df.SOC.diff().dropna()
+    u[u>0] = 0
+    u = u.abs()
+    df['use'] = u
 
     fig = go.Figure([go.Scatter(
     x=df.index,
@@ -165,7 +173,8 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False):
     mode='lines',
     name = "Plugged-in (actual) [true/false]",
     line=dict(
-        color='darkblue'
+        color='black',
+        dash='dot',
     ))])
 
     # Plot the result
@@ -188,6 +197,17 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False):
             opacity=0.8
         ),
         line=dict(
+            color='green',
+            width=2
+        )
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df['use'],
+        mode='lines',
+        name='Use [kWh]',
+        line=dict(
             color='red',
             width=2
         )
@@ -205,15 +225,15 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False):
     ))
 
     fig.add_trace(go.Scatter(
-        x=df.index,
-        y=df['price2'],
-        mode='lines',
-        name='Price2 (loaded from EnergiDataService.dk) [DKK/kWh excl. tarifs]',
-        line=dict(
-            color='purple',
-            width=1,
-            dash='dot'
-        )
+    x=df.index,
+    y=df['price2'],
+    mode='lines',
+    name='Price (EnergiDataService.dk) [DKK/kWh excl. tarifs]',
+    line=dict(
+        color='purple',
+        width=1,
+        dash='dash'
+    )
     ))
 
     # fig.add_trace(go.Scatter(
@@ -252,7 +272,8 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False):
             size=3,
             opacity=0.3,
             color='darkgrey'
-        )
+        ),
+        line=dict(width=0.5, color='DarkSlateGrey', dash='dot')
         # Add index value to hovertext
         # hovertext = df.index
         
@@ -275,8 +296,21 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False):
         mode='lines',
         name = "SOC",
         line=dict(
-            color='lightblue'
+            color='lightblue',
+            width=2
         )
+    ))
+
+    fig.add_trace(go.Scatter(
+    x=df.index,
+    y=df['SOC_lin'],
+    mode='lines',
+    name = "SOC (linear interpolation)",
+    line=dict(
+        color='blue',
+        width=2,
+        dash='dash'
+    )
     ))
 
     if vertical_hover:
@@ -309,26 +343,30 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False):
         #    color="RebeccaPurple"
         #)
     )
-    fig.show()
+    if not df_only:
+        fig.show()
     return df
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[4], show_SOC=True, vertical_hover=True)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=True)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[4], vertical_hover=True)
 
 ids = np.random.choice(vehicle_ids, 5, replace=False)
 for id in ids:
     print("Plotting vehicle", id)
-    PlotChargingProfile(D2, id=id)
+    dfv = PlotChargingProfile(D2, id=id)
 
 
-
-# Get data from VEHICLE_ID == vid
-D2v = D2[D2['VEHICLE_ID'] == 31920]
-D2v.CABLE_PLUGGED_IN_AT
-sesh = D2v.loc[453865]
-eval(sesh.KWHS)
-sesh.KWH
-
-sesh.CABLE_PLUGGED_IN_AT
-sesh.PLANNED_PICKUP_AT
+# Show the top 10 vehicles with the most charging sessions, where battery capacity >= 40 kWh
+indx = D2['capacity_kwh'] >= 40
+vehicles_sorted = D2['VEHICLE_ID'][indx].value_counts().index
+bad_ids = [11015, 17035] # Hardcoded bad ids. Why are they bad? Because charging is "done" way outside of the times of which the vehicle is plugged in.
+N = 10 + len(bad_ids)
+for id in vehicles_sorted[:N]:
+    if id in bad_ids:
+        print("    [Skipping vehicle", id, "]")
+        continue
+    print("Plotting vehicle", id)
+    dfv = PlotChargingProfile(D2, id=id, df_only=False)
+    print(dfv.CableCapacity[1], "\n")
 
 
 ############## What I need - how I need it  ###############################################
@@ -354,5 +392,12 @@ sesh.PLANNED_PICKUP_AT
 #     > D2v = D2[D2['VEHICLE_ID'] == 31572];
 #     > sesh = D2v.loc[184069];
 #     > eval(sesh.KWHS)
+# 3. Sometimes there is a price difference: Probable explaination: Charging in DK2 (I am only fetching prices for DK1)
 #
 # VEHICLES / battery_cap is now well-matched:-)
+
+###### Implement
+# 1. Calc. u_t
+
+##### Consider implementing:
+# 1. The SOC_plugin = CABLE_PLUGGED_IN.minute/60      and  SOC_plugout = -1 * CABLE_RELEASED.minute/60    and SOC_plugout = -1 * PLANNED_PICKUP.minute/60
