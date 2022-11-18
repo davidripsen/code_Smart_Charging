@@ -86,36 +86,13 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
     firsttime = D2v['CABLE_PLUGGED_IN_AT'].min().date() - datetime.timedelta(days=1)
     lasttime = D2v['PLANNED_PICKUP_AT'].max().date() + datetime.timedelta(days=1)
 
-    # fig = go.Figure(data=[go.Scatter(
-    #     x=D2v['CABLE_PLUGGED_IN_AT'],
-    #     y=D2v['KWH'],
-    #     mode='lines+markers',
-    #     name='Plug-in',
-    #     marker=dict(
-    #         size=10,
-    #         opacity=0.8
-    #     )
-    # )])
-
-    # fig.add_trace(go.Scatter(
-    #     x=D2v['PLANNED_PICKUP_AT'],
-    #     y=D2v['KWH'],
-    #     mode='lines+markers',
-    #     name = "Plug-out",
-    #     marker=dict(
-    #         size=10,
-    #         opacity=0.8,
-    #         color='purple'
-    #     )
-    # ))
-
     # Create a list of times from firsttime to lasttime
     times = pd.date_range(firsttime, lasttime, freq='1h')
     # Create a list of zeros
     zeros = np.zeros(len(times))
     nans = np.full(len(times), np.nan)
     # Create a dataframe with these times and zeros
-    df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans})
+    df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans, 'SOCmin': nans, 'BatteryCapacity': nans, 'CableCapacity': nans})
     df['time'] = df['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
     df.z_plan, df.z_act = -1, -1
     # Set the index to be the time
@@ -151,11 +128,18 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
         df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'].ceil('H'), 'SOC'] = D2v.iloc[i]['SOC_START']/100 * D2v.iloc[i]['capacity_kwh']
         df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOC'] = D2v.iloc[i]['SOC']/100 * D2v.iloc[i]['capacity_kwh']
 
-    df['costs'] = df['price'] * df['charge']
+        # Vehicle specifics
+        df['BatteryCapacity'][i] = D2v.iloc[i]['capacity_kwh']
+        df['CableCapacity'][i] = D2v.iloc[i]['max_kw_ac']
 
+        # bmin (PURELY ASSUMPTION)
+        min_charged = 0.4 # 40% of battery capacity
+        min_alltime = 0.05 # Never go below 10%
+        df['SOCmin'][i] = min_alltime * df['BatteryCapacity'][i]
+        df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOCmin'] = min_charged * df['BatteryCapacity'][i]
+
+    df['costs'] = df['price'] * df['charge']
     df = df.merge(df_spot, how='left', left_on='time', right_on='time')
-    df['BatteryCapacity'] = D2v.iloc[i]['capacity_kwh']
-    df['CableCapacity'] = D2v.iloc[i]['max_kw_ac']
     
     # in df['SOC] replace nan with most recent value
     df['SOC_lin'] = df['SOC'].interpolate(method='linear')
@@ -166,6 +150,15 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
     u[u>0] = 0
     u = u.abs()
     df['use'] = u
+
+    # Use linearly interpolated SOC
+    u = df.SOC_lin.diff().dropna()
+    u[u>0] = 0
+    u = u.abs()
+    df['use_lin'] = u
+    # Daily average use
+    df['use_dailyaverage'] = df[df['use_lin'] != 0]['use_lin'].mean()
+
 
     fig = go.Figure([go.Scatter(
     x=df.index,
@@ -215,6 +208,30 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
 
     fig.add_trace(go.Scatter(
         x=df.index,
+        y=df['use_lin'],
+        mode='lines',
+        name='Use (from interpolated SOC) [kWh]',
+        line=dict(
+            color='red',
+            width=2,
+            dash='dot'
+        )
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df['use_dailyaverage'],
+        mode='lines',
+        name='Use daily average (outside of plug-in) [kWh]',
+        line=dict(
+            color='red',
+            width=0.5,
+            dash='dash'
+        )
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df.index,
         y=df['price'],
         mode='lines',
         name='Price [DKK/kWh excl. tarifs]',
@@ -235,33 +252,6 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
         dash='dash'
     )
     ))
-
-    # fig.add_trace(go.Scatter(
-    #     x=D2v['CABLE_PLUGGED_IN_AT'],
-    #     y=D2v['SOC_START'],
-    #     mode='lines+markers',
-    #     name = "SOC_start",
-    #     marker=dict(
-    #         size=5,
-    #         opacity=0.3,
-    #         color='navy'
-    #     ),
-    #     line=dict(width=0.5, color='DarkSlateGrey')
-    # ))
-
-    # fig.add_trace(go.Scatter(
-    #     x=D2v['PLANNED_PICKUP_AT'],
-    #     y=D2v['SOC'],
-    #     mode='lines+markers',
-    #     name = "SOC_end",
-    #     marker=dict(
-    #         size=5,
-    #         opacity=0.3,
-    #         color='darkblue'
-    #     ),
-    #     line=dict(width=0.5, color='DarkSlateGrey')
-
-    # ))
 
     fig.add_trace(go.Scatter(
         x=D2v['PLANNED_PICKUP_AT'],
@@ -309,6 +299,18 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
     line=dict(
         color='blue',
         width=2,
+        dash='dot'
+    )
+    ))
+
+    fig.add_trace(go.Scatter(
+    x=df.index,
+    y=df['SOCmin'],
+    mode='lines',
+    name = "Input: Minimum SOC (assumption)",
+    line=dict(
+        color='blue',
+        width=0.5,
         dash='dash'
     )
     ))
