@@ -18,49 +18,75 @@ plot = True
 use_carnot = True
 
 # Read the csv files
-df = pd.read_csv('data/forecastsGreenerEl/prognoser.csv', sep=',', header=0, parse_dates=True)
+#df = pd.read_csv('data/forecastsGreenerEl/prognoser.csv', sep=',', header=0, parse_dates=True)
 dfspot = pd.read_csv('data/spotprice/df_spot_since_sept22_HourDK.csv', sep=',', header=0, parse_dates=True)
-dfc = pd.read_csv('data/forecastsCarnot/carnot_forecasts.csv', sep=',', header=0, parse_dates=True)
-
+#dfc = pd.read_csv('data/forecastsCarnot/carnot_forecasts.csv', sep=',', header=0, parse_dates=True)
+#dfc = pd.read_csv('data/forecastsCarnot/carnot_forecasts2.csv', sep=',', header=0, parse_dates=True)
+dfc = pd.read_csv('data/forecastsCarnot/carnot_forecasts3.csv', sep=',', header=0, parse_dates=True)
 
 if use_carnot:
     #dfc = dfc[(dfc['SOURCE'] == 'carnot') & (dfc['COUNTRY_AREA_CODE'] == 'DK2')]
-    dfc = dfc[(dfc['COUNTRY_AREA_CODE'] == 'DK2')]
+    #dfc = dfc[(dfc['COUNTRY_AREA_CODE'] == 'DK2')]
+    #df = pd.DataFrame({'Atime': dfc.CREATED_AT, 'Atime_org': dfc.CREATED_AT, 'Time': dfc.TIME_START, 'PredPrice': dfc.FORECAST_PRICE_KWH, 'TruePrice_Carnot': dfc.PRICE_KWH, 'Source': dfc.SOURCE})
     # Make new df with chosen columns
-    df = pd.DataFrame({'Atime': dfc.CREATED_AT, 'Time': dfc.TIME_START, 'PredPrice': dfc.FORECAST_PRICE_KWH, 'TruePrice_Carnot': dfc.PRICE_KWH})
-
-
-
-    df.Atime.value_counts().hist()
-    plt.title('Distribution of forecasts lengths (DK2)')
-    plt.show()
-    Atimes = df.Atime.unique()
+    dfc = dfc[(dfc['source'] == 'carnot')].reset_index(drop=True)
+    df = pd.DataFrame({'Atime': dfc.created_at, 'Atime_org': dfc.created_at, 'Time': dfc.time_start, 'PredPrice': dfc.forecast_price_kwh, 'TruePrice_Carnot': dfc.price_kwh, 'Source': dfc.source})
 
     # Convert Atime and Time to datetime
     df['Atime'] = pd.to_datetime(df['Atime'], format='%Y-%m-%d %H:%M:%S')
+    df['Atime_org'] = pd.to_datetime(df['Atime_org'], format='%Y-%m-%d %H:%M:%S')
     df['Time'] = pd.to_datetime(df['Time'], format='%Y-%m-%d %H:%M:%S')
 
+    # Ceil Atime to the next 5 minutes  
+    #df['Atimec'] = df['Atime'].dt.ceil('10min')
+
+    # Round Atime to latest value where Atime changes a lot next time
+    #df['Atime'] = df['Atime'].dt.round('10min')
+
+    # Handle the fact that the forecasts doesn't have a unique timestamp for when they were fucking created (!)
+    new_forecast = df.Atime_org.diff(1).dt.seconds > 120 # If Atime changes by more than 2 min, then it is a new forecast
+    last_forecast = df[new_forecast == True].index -1
+    print('Number of forecasts: ', len(df[new_forecast]))
+    actual_Atimes = df.Atime_org[last_forecast]; print(actual_Atimes)
+
+    # Set all Atimes to the last Atime before the new forecast
+    j=-1
+    for i in last_forecast:
+        df.loc[j+1 : i, 'Atime'] = df.loc[i, 'Atime']
+        j=i
+
+    # Cut away nans
+    df = df.dropna()
+
+    # Cut away forecasts after 2022-11-11
+    df = df[df['Atime'] < '2022-11-11']
+    horizons = df.Atime.value_counts()
+    #horizons.hist(bins=60)
+    #plt.title('Distribution of forecasts lengths')
+    #plt.show()
+
+    # Cut away forecasts with less than 168 values
+    min_horizon = 96
+    print("Cutting away forecasts with less than 168 values, keeping ", (df.Atime.value_counts() >= min_horizon).mean()*100, "% of forecasts")
+    df = df[df['Atime'].isin(horizons[horizons >= min_horizon].index)]
+
+    # Is there big gaps in Atime?
+    print("Is there big gaps in Atime?")
+    Atime_diff = pd.Series(df.Atime.unique()).diff().dt.seconds
+    # Plotly histogram of Atime_diff
+    fig = px.histogram(Atime_diff, x=Atime_diff, nbins=100)
+    fig.show()
+    Atimes = df.Atime.unique()
+    [str(i) for i in Atimes]
 
     # Plot a timeseries for Atime[44] using plotly
-    i = 23
+    i = 228 # i=23
     fig = px.line(df[df['Atime'] == Atimes[i]], x='Time', y='PredPrice', title='Carnot forecast for Atime number '+ str(i))
     fig.update_xaxes(rangeslider_visible=True)
     fig.show()
-
-    for atime in Atimes[400:450]:
-        # Print all forecasts for Atime
-        print(df[df['Atime'] == atime])
-
-
-    # Subset df for dev (DELETE!!!!!)
-    df = df[:100]
-
-
+    print(df[df['Atime'] == Atimes[i]])
+        # Fucking dublicated signal !
     del dfc
-
-
-
-
 
 if not use_carnot:
     # Convert from EUR/MWh to DKK/KWh
@@ -111,7 +137,7 @@ if plot:
 # For each unique Atime, plot the Price and TruePrice using matplotlib and save to pdf
 pdf = matplotlib.backends.backend_pdf.PdfPages("plots/RawPredictions_movie_CARNOT="+str(use_carnot)+".pdf")
 if plot: # Change to run=True for plotting
-    for Atime in df['Atime'].unique():
+    for Atime in df['Atime'].unique()[:100]:
         dfA = df[df['Atime'] == Atime]
         fig = plt.figure()
         plt.plot(dfA['Time'], dfA['PredPrice'], label='PredPrice')
@@ -120,6 +146,9 @@ if plot: # Change to run=True for plotting
         plt.xlabel('Time')
         plt.ylabel('PredPrice')
         plt.legend()
+        # Make xticks nicely
+        plt.xticks(rotation=45)
+        plt.tight_layout()
         #fig.savefig('plots/plot_' + str(Atime) + '.pdf')
         pdf.savefig(fig)
     pdf.close()

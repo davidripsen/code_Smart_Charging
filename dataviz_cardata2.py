@@ -78,7 +78,7 @@ print("Number of different smart chard IDs:  ", D2.SMART_CHARGE_ID.unique().shap
 ############# Let's extract a single VEHICLE profile ########################################
 vehicle_ids = D2.VEHICLE_ID.unique()
 var = 'VEHICLE_ID'
-def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df_only=False):
+def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, vertical_hover=False, df_only=False):
     D2v = D2[D2[var] == id]
     D2v = D2v.sort_values(by=['CABLE_PLUGGED_IN_AT'])
     id = int(id)
@@ -86,18 +86,25 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
     firsttime = D2v['CABLE_PLUGGED_IN_AT'].min().date() - datetime.timedelta(days=1)
     lasttime = D2v['PLANNED_PICKUP_AT'].max().date() + datetime.timedelta(days=1)
 
+    assert len(D2v.capacity_kwh.unique()) == 1, "Battery capacity changes for vehicle " + str(id)
+    assert len(D2v.max_kw_ac.unique()) == 1, "Cable capacity changes for vehicle " + str(id)
+
     # Create a list of times from firsttime to lasttime
     times = pd.date_range(firsttime, lasttime, freq='1h')
     # Create a list of zeros
     zeros = np.zeros(len(times))
     nans = np.full(len(times), np.nan)
     # Create a dataframe with these times and zeros
-    df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans, 'SOCmin': nans, 'BatteryCapacity': nans, 'CableCapacity': nans})
+    df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans, 'SOCmin': nans, 'BatteryCapacity': nans, 'CableCapacity': nans, 'efficiency': nans})
     df['time'] = df['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
     df.z_plan, df.z_act = -1, -1
     # Set the index to be the time
     df = df.set_index('time')
     
+    # Vehicle specifics
+    df['BatteryCapacity'] = D2v.iloc[-1]['capacity_kwh']
+    df['CableCapacity'] = D2v.iloc[-1]['max_kw_ac']
+
     # Loop over all plug-ins and plug-outs     # ADD KWH AND SOC RELATIVE TO TIMES
     for i in range(len(D2v)):
         # Set z=1 for all times from plug-in to plug-out
@@ -116,6 +123,10 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
         xt = xt.set_index('time')
         df.loc[xt.index, 'charge'] = xt['value']
 
+        # Efficiency of charging (ratio of what has been charged to what goes into the battery)
+        #if D2v.iloc[i]['KWH'] >= 1: # Only proper charging
+        df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['RELEASED_AT'], 'efficiency'] = ((D2v.iloc[i].SOC - D2v.iloc[i].SOC_START) / 100 * D2v.iloc[i]['capacity_kwh']) / D2v.iloc[i].KWH
+
         # Add the right spot prices to df
         if type(D2v.iloc[i]['SPOT_PRICES']) == str and len(eval(D2v.iloc[i]['SPOT_PRICES'])) != 0:
             prices = pd.DataFrame(eval(D2v.iloc[i]['SPOT_PRICES']))
@@ -128,15 +139,11 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
         df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'].ceil('H'), 'SOC'] = D2v.iloc[i]['SOC_START']/100 * D2v.iloc[i]['capacity_kwh']
         df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOC'] = D2v.iloc[i]['SOC']/100 * D2v.iloc[i]['capacity_kwh']
 
-        # Vehicle specifics
-        df['BatteryCapacity'][i] = D2v.iloc[i]['capacity_kwh']
-        df['CableCapacity'][i] = D2v.iloc[i]['max_kw_ac']
-
         # bmin (PURELY ASSUMPTION)
         min_charged = 0.4 # 40% of battery capacity
         min_alltime = 0.05 # Never go below 10%
-        df['SOCmin'][i] = min_alltime * df['BatteryCapacity'][i]
-        df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOCmin'] = min_charged * df['BatteryCapacity'][i]
+        df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOCmin'] = min_charged * df['BatteryCapacity'][i] # Min SOC
+        df['SOCmin'] = df['SOCmin'].fillna(min_alltime * df['BatteryCapacity'][i])
 
     df['costs'] = df['price'] * df['charge']
     df = df.merge(df_spot, how='left', left_on='time', right_on='time')
@@ -159,7 +166,17 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
     # Daily average use
     df['use_dailyaverage'] = df[df['use_lin'] != 0]['use_lin'].mean()
 
+    # Calculate 7-day rolling mean of use_lin
+    roll_length = 7
+    df['use_rolling'] = df['use_lin'].rolling(roll_length*24).mean()
 
+    # Exponential moving average
+    hlf_life = 3.5 # days
+    df['use_ema'] = df['use_lin'].ewm(span=roll_length*24).mean()
+
+
+
+    #################### START THE PLOTTING ###########################################
     fig = go.Figure([go.Scatter(
     x=df.index,
     y=df['z_act'],
@@ -219,6 +236,18 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
     ))
 
     fig.add_trace(go.Scatter(
+    x=df.index,
+    y=df['use_rolling'],
+    mode='lines',
+    name='Use ('+str(roll_length)+' day rolling mean) [kWh]',
+    line=dict(
+        color='red',
+        width=2,
+        dash='dot'
+    )
+    ))
+
+    fig.add_trace(go.Scatter(
         x=df.index,
         y=df['use_dailyaverage'],
         mode='lines',
@@ -258,18 +287,20 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
         y=D2v['SOC_LIMIT']/100 * D2v['capacity_kwh'],
         mode='lines+markers',
         name = "SOC limit",
-        marker=dict(
-            size=3,
-            opacity=0.3,
-            color='darkgrey'
-        ),
-        line=dict(width=0.5, color='DarkSlateGrey', dash='dot')
+        line=dict(width=2, color='grey') #color='DarkSlateGrey')
         # Add index value to hovertext
         # hovertext = df.index
-        
     ))
 
-    # Show BatteryCapacity
+    if plot_efficiency:
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df['efficiency']*100,
+            mode='lines',
+            name = "Efficiency [%]",
+            line=dict(width=2, color='DarkSlateGrey')
+        ))
+
     fig.add_trace(go.Scatter(
         x=df.index,
         y=df['BatteryCapacity'],
@@ -297,7 +328,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
     mode='lines',
     name = "SOC (linear interpolation)",
     line=dict(
-        color='blue',
+        color='lightblue',
         width=2,
         dash='dot'
     )
@@ -309,8 +340,8 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
     mode='lines',
     name = "Input: Minimum SOC (assumption)",
     line=dict(
-        color='blue',
-        width=0.5,
+        color='lightblue',
+        width=2,
         dash='dash'
     )
     ))
@@ -348,7 +379,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False, df
     if not df_only:
         fig.show()
     return df
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=True)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[4], vertical_hover=True)
 
 ids = np.random.choice(vehicle_ids, 5, replace=False)
@@ -360,7 +391,7 @@ for id in ids:
 # Show the top 10 vehicles with the most charging sessions, where battery capacity >= 40 kWh
 indx = D2['capacity_kwh'] >= 40
 vehicles_sorted = D2['VEHICLE_ID'][indx].value_counts().index
-bad_ids = [11015, 17035] # Hardcoded bad ids. Why are they bad? Because charging is "done" way outside of the times of which the vehicle is plugged in.
+bad_ids = [11015, 17035] # +14617, Hardcoded bad ids. Why are they bad? Because charging is "done" way outside of the times of which the vehicle is plugged in.
 N = 10 + len(bad_ids)
 for id in vehicles_sorted[:N]:
     if id in bad_ids:
