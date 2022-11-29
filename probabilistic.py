@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import datetime as dt
-plot=False
+plot=True
 
 # Read the dfp and dft
 dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
@@ -30,11 +30,11 @@ BigM = dfr.max().iloc[-1] # 25000
 dfr = dfr.replace(BigM, np.nan)
 
 # Make beautiful matplotlib histograms of the residuals for each time step and save them all in one pdf
-maxstep = 152
+maxstep = 145
 steps = dfr.columns[2:(2+maxstep)]
 
 if plot:
-    pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Histograms_of_residuals_per_timestep.pdf")
+    pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Histograms_of_residuals_per_timestep_Carnot.pdf")
     for step in steps:
         fig = plt.figure()
         plt.hist(dfr[step][~np.isnan(dfr[step])], bins=50, density=True)
@@ -52,6 +52,8 @@ if plot:
 
         plt.xlabel('Residual')
         plt.ylabel('Densiy')
+        plt.xlim([-5,5])
+        plt.ylim([0,0.65])
         #plt.show()
         pdf.savefig(fig)
     pdf.close()
@@ -111,7 +113,7 @@ if plot:
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=mu.index, y=mu.values, mode='lines+markers', name='Mean'))
     fig.update_layout(title='Mean of the residuals per timestep', xaxis_title='Timestep', yaxis_title='Mean')
-    fig.write_html("plots/Mean_of_residuals_per_timestep.html")
+    fig.write_html("plots/Mean_of_residuals_per_timestep_Carnot.html")
     fig.show()
 
 # Visualise covariance matrix
@@ -121,9 +123,9 @@ if plot:
             x=np.arange(maxstep),#cov.columns,
             y=np.arange(maxstep),#cov.columns,
             colorscale='Viridis'))
-    fig.update_layout(title='Covariance matrix of residuals')
+    fig.update_layout(title='Covariance matrix of residuals per timestep', xaxis_title='Timestep', yaxis_title='Timestep')
     fig.show()
-    fig.write_html("plots/Covariance_matrix_of_residuals.html")
+    fig.write_html("plots/Covariance_matrix_of_residuals_Carnot.html")
 
 
 # Generate 100 samples from the multivariate normal distribution
@@ -147,8 +149,6 @@ if plot:
             (x=mu.index, y=samples[i,:], mode='lines', name='Sample '+str(i), line=dict(width=0.5, color='gray')))
     fig.update_layout(title='Samples from the multivariate normal distribution', xaxis_title='Timestep', yaxis_title='Residual')
     fig.show()
-    fig.write_html("plots/Samples_from_multivariate_normal_distribution.html")
+    fig.write_html("plots/Samples_from_multivariate_normal_distribution_Carnot.html")
 
     # = Prediction interval (under correct model assumption)
-
-

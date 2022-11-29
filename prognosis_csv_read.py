@@ -15,6 +15,7 @@ import seaborn as sns
 sns.set_theme()
 pd.set_option('display.max_rows', 500)
 plot = True
+plot_alot = False
 use_carnot = True
 
 # Read the csv files
@@ -61,9 +62,10 @@ if use_carnot:
     # Cut away forecasts after 2022-11-11
     df = df[df['Atime'] < '2022-11-11']
     horizons = df.Atime.value_counts()
-    #horizons.hist(bins=60)
-    #plt.title('Distribution of forecasts lengths')
-    #plt.show()
+    if plot_alot:
+        horizons.hist(bins=60)
+        plt.title('Distribution of forecasts lengths')
+        plt.show()
 
     # Cut away forecasts with less than 168 values
     min_horizon = 96
@@ -74,19 +76,25 @@ if use_carnot:
     print("Is there big gaps in Atime?")
     Atime_diff = pd.Series(df.Atime.unique()).diff().dt.seconds
     # Plotly histogram of Atime_diff
-    fig = px.histogram(Atime_diff, x=Atime_diff, nbins=100)
-    fig.show()
+    if plot_alot:
+        fig = px.histogram(Atime_diff, x=Atime_diff, nbins=100)
+        fig.show()
     Atimes = df.Atime.unique()
     [str(i) for i in Atimes]
 
     # Plot a timeseries for Atime[44] using plotly
-    i = 228 # i=23
-    fig = px.line(df[df['Atime'] == Atimes[i]], x='Time', y='PredPrice', title='Carnot forecast for Atime number '+ str(i))
-    fig.update_xaxes(rangeslider_visible=True)
-    fig.show()
-    print(df[df['Atime'] == Atimes[i]])
+    i = 78 # i=23
+    if plot_alot:
+        fig = px.line(df[df['Atime'] == Atimes[i]], x='Time', y='PredPrice', title='Carnot forecast for Atime number '+ str(i))
+        fig.update_xaxes(rangeslider_visible=True)
+        fig.show()
+
+    for i in [4, 78, 209, 700, 900, 1200, 1241]:
+        print(df[df['Atime'] == Atimes[i]])
         # Fucking dublicated signal !
-    del dfc
+        # Forecasts (almost!)  always start with 22.00  == 24.00 in UTC+2 (summer time), 22 == 23 in UTC+1 (winter time)
+        # Seems random when there is data directly from nordpool.
+
 
 if not use_carnot:
     # Convert from EUR/MWh to DKK/KWh
@@ -108,8 +116,53 @@ dfspot.drop(columns=['PriceArea', 'SpotPriceEUR'], inplace=True)
 dfspot['TruePrice'] = dfspot['TruePrice']/1000 # Convert to kWh
 dfspot['Time'] = pd.to_datetime(dfspot['Time'], format='%Y-%m-%d %H:%M:%S')
 
+
+###### Insert known prices in Carnot forecasts
+    # Hours ahead where price is known  # Assume available at 13 o' clock CET/CEST
+df['Atime_CET/CEST'] =  df.Atime.dt.tz_localize("UTC").dt.tz_convert("Europe/Copenhagen")
+df['DayAhead_avail'] = df['Atime_CET/CEST'].dt.hour >= 13
+cnt = 0
+for i, atime in enumerate(df.Atime.unique()):
+    print(i)
+    dfA = df[df['Atime'] == atime]
+    # Cut away predictions BEFORE Atime
+    dfA = dfA[dfA['Time'] >= dfA['Atime'].dt.floor('H')]
+
+    # Assure that right length
+    knownhours = pd.date_range(start=pd.Series(atime).dt.floor('H').min(), end=pd.Series(dfA['Time'].iloc[0]).min(), freq='1H')[:-1]
+    knownhoursCOP = knownhours.tz_localize("UTC").tz_convert("Europe/Copenhagen").hour
+    zeros = np.where(knownhoursCOP == 0)
+    if sum(knownhoursCOP == 0) >= 2:
+        knownhours = knownhours[:zeros[-1][-1]] # If there are two 0's, cut away after the last one.
+        knownhoursCOP = knownhoursCOP[:zeros[-1][-1]]
+        cnt=cnt+1
+        print('Hours cut off because of two 0s at ', i, '  <=> forecasts are missing  ', atime)
+
+    zeros = np.where(knownhoursCOP == 0)
+
+    # Check if two consecutive numbers are the same in knownhoursCOP
+    timezone_change = 1 if sum(knownhoursCOP[1:] == knownhoursCOP[:-1]) >= 1 else 0
+
+    if not dfA.DayAhead_avail.iloc[-1] and len(knownhours) > 0:
+        if len(knownhoursCOP) > 24 - knownhoursCOP[0] + timezone_change:
+            knownhours = knownhours[:zeros[-1][-1]] # If Days-Ahead is not AND there is more hours than up to 23.00, then cut away at the last 0.
+            cnt=cnt+1
+            print('Gap between Atime and First time is too long <=>  forecasts are missing ', i,' ', atime)
+
+    assert len(knownhours) <= 24 + timezone_change + 24*dfA.DayAhead_avail.iloc[-1], "More than 24 hours of known prices, but not DayAhead_avail"
+    # Concat knownhours to dfA
+    dfA = pd.concat([pd.DataFrame({'Atime': atime, 'Atime_org': np.nan, 'Time': knownhours, 'PredPrice': np.nan, 'TruePrice_Carnot': np.nan, 'Source': 'nordpool_insert'}), dfA])
+
+    # Insert dfA in df
+    df = df.drop(df[df['Atime'] == atime].index)
+    df = pd.concat([df, dfA])
+print('Number of times hours were cut off', cnt)
+
 # (!) Merge df and dfspot on Time (!)
 df = pd.merge(df, dfspot, on='Time', how='left')
+
+# PredPrice = TruePrice if source=='nordpool_insert'
+df.loc[df['Source'] == 'nordpool_insert', 'PredPrice'] = df['TruePrice']
 
 # Delete rows in dfspot where dfspot.Time is not in df.Time, reverse order and reset index - and export
 dfspot = dfspot[dfspot['Time'].isin(df['Time'])]
@@ -126,7 +179,7 @@ del dfspot
 
 
 # Plot Price vs TruePrice using plotly
-if plot:
+if plot_alot:
     import plotly.graph_objects as go
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df['Time'], y=df['PredPrice'], mode='lines', name='PredPrice'))
@@ -135,20 +188,22 @@ if plot:
     fig.show()
 
 # For each unique Atime, plot the Price and TruePrice using matplotlib and save to pdf
-pdf = matplotlib.backends.backend_pdf.PdfPages("plots/RawPredictions_movie_CARNOT="+str(use_carnot)+".pdf")
+pdf = matplotlib.backends.backend_pdf.PdfPages("plots/ModPredictions_movie_CARNOT="+str(use_carnot)+".pdf")
 if plot: # Change to run=True for plotting
-    for Atime in df['Atime'].unique()[:100]:
+    for Atime in df['Atime'].unique():
         dfA = df[df['Atime'] == Atime]
         fig = plt.figure()
         plt.plot(dfA['Time'], dfA['PredPrice'], label='PredPrice')
-        plt.plot(dfA['Time'], dfA['TruePrice'], label='TruePrice')
+        plt.plot(dfA['Time'], dfA['TruePrice'], label='TruePrice', linestyle='dashed')
+        plt.axvline(x=Atime, color='r', linestyle='--', label='Atime of forecast')
         plt.title('Price vs TruePrice for Atime = ' + str(Atime))
         plt.xlabel('Time')
+        plt.ylim([-0.1, df.PredPrice.max()])
         plt.ylabel('PredPrice')
         plt.legend()
-        # Make xticks nicely
         plt.xticks(rotation=45)
         plt.tight_layout()
+        #plt.show()
         #fig.savefig('plots/plot_' + str(Atime) + '.pdf')
         pdf.savefig(fig)
     pdf.close()
@@ -177,7 +232,7 @@ minH = df['Atime'].value_counts().min()
 ##############################################################################
 # Change df into MPC-friendly format with constant timesteps
 ##############################################################################
-h = 200 # horizon: t = 0..h
+h = 145 # horizon: t = 0..h
 BigM = int(25000)  # BigM padding value for padding forecasts [EUR/MWh]
 
 def SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=None, BigM=20000):
@@ -201,59 +256,70 @@ def SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=None, 
     df2.insert(1, 'Atime_diff', (diff.days * 24 + diff.seconds/3600).astype(int))
     df2.drop(columns=['Atime_next'], inplace=True)
 
-    if use_known_prices & (dftrue is not None):
+    # Greener El forecasts
+    if use_known_prices & (dftrue is not None) & (not use_carnot):
         print('Using known prices')
-        # Hours ahead where price is known
+        # Hours ahead where price is known  # Assume available at 13 o' clock CET/CEST
         wellknownhours = 48 - (df2['Atime'].dt.hour + 1)
 
         # Replace values        
         for j, wk in enumerate(wellknownhours):
             for i in range(0, wk):
                 df2.loc[j, 't' + str(i)] = dftrue.loc[j, 't' + str(i)]
-
     return df2
 dft = SliceDataFrame(df, h, var='TruePrice', BigM=BigM) #df with TruePrice as values
-dfp = SliceDataFrame(df, h, var='PredPrice', use_known_prices=True, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
+dfp = SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
 
-# df with only known prices, for imput to Day-Ahead Smart Charge
-dfk = pd.DataFrame(columns=['Atime'] + ['t' + str(i) for i in range(0,h+1)])
-dfk['Atime'] = df['Atime'].unique()
-wellknownhours = 48 - (dfk['Atime'].dt.hour + 1)
-dfk['Atime_next'] = dfk['Atime'].shift(-1)
-dfk['Atime_next'].iloc[-1] = endtime+pd.Timedelta(hours=1)
-diff = pd.Series((pd.Series(dfk['Atime_next']).dt.ceil('H') - pd.Series(dfk['Atime']).dt.ceil('H'))).dt
-dfk.insert(1, 'Atime_diff', (diff.days * 24 + diff.seconds/3600).astype(int))
-dfk.drop(columns=['Atime_next'], inplace=True)
-for j, wk in enumerate(wellknownhours):
-    for i in range(0, wk):
-        dfk.loc[j, 't' + str(i)] = dft.loc[j, 't' + str(i)]
-dfk.fillna(BigM, inplace=True)
+if not use_carnot:
+    # df with only known prices, for imput to Day-Ahead Smart Charge
+    dfk = pd.DataFrame(columns=['Atime'] + ['t' + str(i) for i in range(0,h+1)])
+    dfk['Atime'] = df['Atime'].unique()
+    wellknownhours = 48 - (dfk['Atime'].dt.hour + 1)
+    dfk['Atime_next'] = dfk['Atime'].shift(-1)
+    dfk['Atime_next'].iloc[-1] = endtime+pd.Timedelta(hours=1)
+    diff = pd.Series((pd.Series(dfk['Atime_next']).dt.ceil('H') - pd.Series(dfk['Atime']).dt.ceil('H'))).dt
+    dfk.insert(1, 'Atime_diff', (diff.days * 24 + diff.seconds/3600).astype(int))
+    dfk.drop(columns=['Atime_next'], inplace=True)
+    for j, wk in enumerate(wellknownhours):
+        for i in range(0, wk):
+            dfk.loc[j, 't' + str(i)] = dft.loc[j, 't' + str(i)]
+    dfk.fillna(BigM, inplace=True)
+    dfk.to_csv('data/MPC-ready/df_knownprices_for_mpc.csv', index=False)
 
 # Export to csv
 dft.to_csv('data/MPC-ready/df_trueprices_for_mpc.csv', index=False)
 dfp.to_csv('data/MPC-ready/df_predprices_for_mpc.csv', index=False)
-dfk.to_csv('data/MPC-ready/df_knownprices_for_mpc.csv', index=False)
+
+# Import from csv
+dft = pd.read_csv('data/MPC-ready/df_trueprices_for_mpc.csv')
+dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv')
 
 # For each Atime plot the Predicted Price (dfp) and TruePrice (dft) throughout the horizon
-if not use_carnot:
-    pdf = matplotlib.backends.backend_pdf.PdfPages("plots/ModPredictions_movie_Carnot="+str(use_carnot)+".pdf")
-    if plot: # Change to run=True for plotting
-        for i, Atime in enumerate(dfp['Atime']):
-            fig = plt.figure()
-            plt.plot(np.arange(0,h+1), dfp.iloc[i,2:(2+minH+1)], label='PredictedPrice')
-            plt.plot(np.arange(0,h+1), dft.iloc[i,2:(2+minH+1)], label='TruePrice', linestyle='-.', color='black')
-            plt.title('PredictedPrice vs TruePrice for Atime = ' + str(Atime))
-            plt.xlabel('Time [h]')
-            plt.ylabel('Price [EUR/MWh]')
-            plt.legend()
-            #fig.savefig('plots/PredMovie2/PredictedPrice_' + str(Atime) + '.pdf')
-            pdf.savefig(fig)
-        pdf.close()
-
+K_plots = len(dfp['Atime'].unique()) # 200
+minH = df['Atime'].value_counts().min()
+pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Sliced_Predictions_movie_Carnot="+str(use_carnot)+".pdf")
+if plot: # Change to run=True for plotting
+    for i, Atime in enumerate(dfp['Atime'][:K_plots]):
+        fig = plt.figure()
+        plt.plot(np.arange(0,minH+1), dfp.iloc[i,2:(2+minH+1)], label='PredictedPrice')
+        plt.plot(np.arange(0,minH+1), dft.iloc[i,2:(2+minH+1)], label='TruePrice', linestyle='--')
+        plt.title('PredictedPrice vs TruePrice')
+        plt.xlabel('Time [h]     from ' + str(Atime))
+        plt.ylabel('Price [DKK/kWh]')
+        plt.ylim([-0.1, df.PredPrice.max()])
+        plt.grid(axis='x', linestyle='-')
+        plt.xticks(np.arange(0, minH+1, 1.0))
+        plt.axvline(x=Atime, color='r', linestyle='--', label='Atime of forecast')
+        plt.tight_layout()
+        plt.legend()
+        #plt.show()
+        #fig.savefig('plots/PredMovie2/PredictedPrice_' + str(Atime) + '.pdf')
+        pdf.savefig(fig)
+    pdf.close()
 
 ##############################################################################  
     
-
+#### About Greener El forecasts #####
 # They are OK, but
 # 1) When the first 12-36 hours are completely known, they should be part of the "forecast" (HANDLED)
 #     - All forecasts are made AFTER that the spot prices are publicly available at NordPool.

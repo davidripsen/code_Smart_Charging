@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import datetime as dt
 import plotly.graph_objects as go
 import datetime
+import pickle
 pd.set_option('display.max_rows', 500)
 
 #dfA1 = pd.read_csv('data/Monta/charges_part1.csv', sep=',', header=0, parse_dates=True, low_memory=False)
@@ -35,7 +36,7 @@ for var in timevars:
     D[var] = D[var].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
     D[var] = pd.to_datetime(D[var], format='%Y-%m-%d %H:%M:%S')
 
-df_spot = pd.DataFrame({'time': spot['HourUTC'], 'price2': spot['SpotPriceDKK']/1000})
+df_spot = pd.DataFrame({'time': spot['HourUTC'], 'trueprice': spot['SpotPriceDKK']/1000})
 df_spot['time'] = pd.to_datetime(df_spot['time'], format='%Y-%m-%d %H:%M:%S')
 df_spot = df_spot.set_index('time')
 df_spot.index = df_spot.index.tz_localize('UTC').tz_convert('Europe/Copenhagen')
@@ -78,103 +79,121 @@ print("Number of different smart chard IDs:  ", D2.SMART_CHARGE_ID.unique().shap
 ############# Let's extract a single VEHICLE profile ########################################
 vehicle_ids = D2.VEHICLE_ID.unique()
 var = 'VEHICLE_ID'
-def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, vertical_hover=False, df_only=False):
-    D2v = D2[D2[var] == id]
-    D2v = D2v.sort_values(by=['CABLE_PLUGGED_IN_AT'])
-    id = int(id)
+df_vehicle=None
+def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, vertical_hover=False, df_only=False, df_vehicle=None):
+    """
+    Plot the charging profile of a single vehicle
+    If df_only is True, then only the dataframe is returned
+    If df_vehicle is not None, then only plotting is done
+    """
 
-    firsttime = D2v['CABLE_PLUGGED_IN_AT'].min().date() - datetime.timedelta(days=1)
-    lasttime = D2v['PLANNED_PICKUP_AT'].max().date() + datetime.timedelta(days=1)
+    if df_vehicle is None:
+        D2v = D2[D2[var] == id]
+        D2v = D2v.sort_values(by=['CABLE_PLUGGED_IN_AT'])
+        id = int(id)
 
-    assert len(D2v.capacity_kwh.unique()) == 1, "Battery capacity changes for vehicle " + str(id)
-    assert len(D2v.max_kw_ac.unique()) == 1, "Cable capacity changes for vehicle " + str(id)
+        firsttime = D2v['CABLE_PLUGGED_IN_AT'].min().date() - datetime.timedelta(days=1)
+        lasttime = D2v['PLANNED_PICKUP_AT'].max().date() + datetime.timedelta(days=1)
 
-    # Create a list of times from firsttime to lasttime
-    times = pd.date_range(firsttime, lasttime, freq='1h')
-    # Create a list of zeros
-    zeros = np.zeros(len(times))
-    nans = np.full(len(times), np.nan)
-    # Create a dataframe with these times and zeros
-    df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans, 'SOCmin': nans, 'BatteryCapacity': nans, 'CableCapacity': nans, 'efficiency': nans})
-    df['time'] = df['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
-    df.z_plan, df.z_act = -1, -1
-    # Set the index to be the time
-    df = df.set_index('time')
-    
-    # Vehicle specifics
-    df['BatteryCapacity'] = D2v.iloc[-1]['capacity_kwh']
-    df['CableCapacity'] = D2v.iloc[-1]['max_kw_ac']
+        assert len(D2v.capacity_kwh.unique()) == 1, "Battery capacity changes for vehicle " + str(id)
+        assert len(D2v.max_kw_ac.unique()) == 1, "Cable capacity changes for vehicle " + str(id)
 
-    # Loop over all plug-ins and plug-outs     # ADD KWH AND SOC RELATIVE TO TIMES
-    for i in range(len(D2v)):
-        # Set z=1 for all times from plug-in to plug-out
-        df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['PLANNED_PICKUP_AT'], 'z_plan'] = 1 #i=2, ser ud til at være fucked, når CABLE_PLUGGED_IN_AT IKKE er heltal.
-        df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['RELEASED_AT'], 'z_act'] = 1
-
-        # Allow semi-discrete plug-in relative to proportion of the hour
-        #df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'], 'z_plan'] = 1
-
-        # Extract charge from 'KWHS' and add to df where time is the same
-        xt = pd.DataFrame(eval(D2v.iloc[i]['KWHS']))
-        if D2v.iloc[i]['KWH'] != round(xt.sum()[1],4):
-            print("KWH total and sum(kWh_t) does not match for D2v row i=", i)
-        xt['time'] = pd.to_datetime(xt['time'])
-        xt['time'] = xt['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
-        xt = xt.set_index('time')
-        df.loc[xt.index, 'charge'] = xt['value']
-
-        # Efficiency of charging (ratio of what has been charged to what goes into the battery)
-        #if D2v.iloc[i]['KWH'] >= 1: # Only proper charging
-        df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['RELEASED_AT'], 'efficiency'] = ((D2v.iloc[i].SOC - D2v.iloc[i].SOC_START) / 100 * D2v.iloc[i]['capacity_kwh']) / D2v.iloc[i].KWH
-
-        # Add the right spot prices to df
-        if type(D2v.iloc[i]['SPOT_PRICES']) == str and len(eval(D2v.iloc[i]['SPOT_PRICES'])) != 0:
-            prices = pd.DataFrame(eval(D2v.iloc[i]['SPOT_PRICES']))
-            prices['time'] = pd.to_datetime(prices['time'])
-            prices['time'] = prices['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
-            prices = prices.set_index('time')
-            df.loc[prices.index, 'price'] = prices['value']
+        # Create a list of times from firsttime to lasttime
+        times = pd.date_range(firsttime, lasttime, freq='1h')
+        # Create a list of zeros
+        zeros = np.zeros(len(times))
+        nans = np.full(len(times), np.nan)
+        # Create a dataframe with these times and zeros
+        df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans, 'SOCmin': nans, 'BatteryCapacity': nans, 'CableCapacity': nans, 'efficiency': nans})
+        df['time'] = df['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
+        df.z_plan, df.z_act = -1, -1
+        # Set the index to be the time
+        df = df.set_index('time')
         
-        # Add SOC and convert to kWhs
-        df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'].ceil('H'), 'SOC'] = D2v.iloc[i]['SOC_START']/100 * D2v.iloc[i]['capacity_kwh']
-        df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOC'] = D2v.iloc[i]['SOC']/100 * D2v.iloc[i]['capacity_kwh']
+        # Vehicle specifics
+        df['BatteryCapacity'] = D2v.iloc[-1]['capacity_kwh']
+        df['CableCapacity'] = D2v.iloc[-1]['max_kw_ac']
 
-        # bmin (PURELY ASSUMPTION)
-        min_charged = 0.4 # 40% of battery capacity
-        min_alltime = 0.05 # Never go below 10%
-        df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOCmin'] = min_charged * df['BatteryCapacity'][i] # Min SOC
-        df['SOCmin'] = df['SOCmin'].fillna(min_alltime * df['BatteryCapacity'][i])
+        # Loop over all plug-ins and plug-outs     # ADD KWH AND SOC RELATIVE TO TIMES
+        for i in range(len(D2v)):
+            # Set z=1 for all times from plug-in to plug-out
+            df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['PLANNED_PICKUP_AT'], 'z_plan'] = 1 #i=2, ser ud til at være fucked, når CABLE_PLUGGED_IN_AT IKKE er heltal.
+            df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['RELEASED_AT'], 'z_act'] = 1
 
-    df['costs'] = df['price'] * df['charge']
-    df = df.merge(df_spot, how='left', left_on='time', right_on='time')
-    
-    # in df['SOC] replace nan with most recent value
-    df['SOC_lin'] = df['SOC'].interpolate(method='linear')
-    df['SOC'] = df['SOC'].fillna(method='ffill')
+            # Allow semi-discrete plug-in relative to proportion of the hour
+            #df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'], 'z_plan'] = 1
 
-    # Use
-    u = df.SOC.diff().dropna()
-    u[u>0] = 0
-    u = u.abs()
-    df['use'] = u
+            # Extract charge from 'KWHS' and add to df where time is the same
+            xt = pd.DataFrame(eval(D2v.iloc[i]['KWHS']))
+            if D2v.iloc[i]['KWH'] != round(xt.sum()[1],4):
+                print("KWH total and sum(kWh_t) does not match for D2v row i=", i)
+            xt['time'] = pd.to_datetime(xt['time'])
+            xt['time'] = xt['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
+            xt = xt.set_index('time')
+            df.loc[xt.index, 'charge'] = xt['value']
 
-    # Use linearly interpolated SOC
-    u = df.SOC_lin.diff().dropna()
-    u[u>0] = 0
-    u = u.abs()
-    df['use_lin'] = u
-    # Daily average use
-    df['use_dailyaverage'] = df[df['use_lin'] != 0]['use_lin'].mean()
+            # Efficiency of charging (ratio of what has been charged to what goes into the battery)
+            #if D2v.iloc[i]['KWH'] >= 1: # Only proper charging
+            df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['RELEASED_AT'], 'efficiency'] = ((D2v.iloc[i].SOC - D2v.iloc[i].SOC_START) / 100 * D2v.iloc[i]['capacity_kwh']) / D2v.iloc[i].KWH
 
-    # Calculate 7-day rolling mean of use_lin
-    roll_length = 7
-    df['use_rolling'] = df['use_lin'].rolling(roll_length*24).mean()
+            # Add the right spot prices to df
+            if type(D2v.iloc[i]['SPOT_PRICES']) == str and len(eval(D2v.iloc[i]['SPOT_PRICES'])) != 0:
+                prices = pd.DataFrame(eval(D2v.iloc[i]['SPOT_PRICES']))
+                prices['time'] = pd.to_datetime(prices['time'])
+                prices['time'] = prices['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
+                prices = prices.set_index('time')
+                df.loc[prices.index, 'price'] = prices['value']
+            
+            # Add SOC and convert to kWhs
+            df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'].ceil('H'), 'SOC'] = D2v.iloc[i]['SOC_START']/100 * D2v.iloc[i]['capacity_kwh']
+            df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOC'] = D2v.iloc[i]['SOC']/100 * D2v.iloc[i]['capacity_kwh']
 
-    # Exponential moving average
-    hlf_life = 3.5 # days
-    df['use_ema'] = df['use_lin'].ewm(span=roll_length*24).mean()
+            # bmin (PURELY ASSUMPTION)
+            min_charged = 0.4 # 40% of battery capacity
+            min_alltime = 0.05 # Never go below 10%
+            df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOCmin'] = min_charged * df['BatteryCapacity'][i] # Min SOC
+            df['SOCmin'] = df['SOCmin'].fillna(min_alltime * df['BatteryCapacity'][i])
 
+        df['costs'] = df['price'] * df['charge']
+        df = df.merge(df_spot, how='left', left_on='time', right_on='time')
+        
+        # in df['SOC] replace nan with most recent value
+        df['SOC_lin'] = df['SOC'].interpolate(method='linear')
+        df['SOC'] = df['SOC'].fillna(method='ffill')
 
+        # Use
+        u = df.SOC.diff().dropna()
+        u[u>0] = 0
+        u = u.abs()
+        df['use'] = u
+
+        # Use linearly interpolated SOC
+        u = df.SOC_lin.diff().dropna()
+        u[u>0] = 0
+        u = u.abs()
+        df['use_lin'] = u
+        # Daily average use
+        df['use_dailyaverage'] = df[df['use_lin'] != 0]['use_lin'].mean()
+
+        # Calculate 7-day rolling mean of use_lin
+        roll_length = 7
+        df['use_rolling'] = df[df['use_lin'] != 0]['use_lin'].rolling(roll_length*24, min_periods=24).mean()
+        df['use_rolling'] = df['use_rolling'].fillna(0)
+        # Issues: When subsetting on NOT plugged_in, the roll length of 7*24 steps becomes more than 7 days
+        # Issues: Initial 7 days
+
+        # Exponential moving average
+        hlf_life = 2 # days
+        df['use_ewm'] = df[df['use_lin'] != 0]['use_lin'].ewm(span=roll_length*24, min_periods=24).mean()
+        df['use_ewm'] = df['use_ewm'].fillna(0)
+
+        # Median prediction of efficiency
+        df['efficiency_median'] = df['efficiency'].median()
+
+        # Add vehicle id
+        df['vehicle_id'] = id
+    else:
+        df = df_vehicle
 
     #################### START THE PLOTTING ###########################################
     fig = go.Figure([go.Scatter(
@@ -248,6 +267,18 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
     ))
 
     fig.add_trace(go.Scatter(
+    x=df.index,
+    y=df['use_ewm'],
+    mode='lines',
+    name='Use (Exponentially Weighted Moving Average with half life = '+str(hlf_life)+') [kWh]',
+    line=dict(
+        color='red',
+        width=2,
+        dash='dash'
+    )
+    ))
+
+    fig.add_trace(go.Scatter(
         x=df.index,
         y=df['use_dailyaverage'],
         mode='lines',
@@ -272,7 +303,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
 
     fig.add_trace(go.Scatter(
     x=df.index,
-    y=df['price2'],
+    y=df['trueprice'],
     mode='lines',
     name='Price (EnergiDataService.dk) [DKK/kWh excl. tarifs]',
     line=dict(
@@ -299,6 +330,14 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
             mode='lines',
             name = "Efficiency [%]",
             line=dict(width=2, color='DarkSlateGrey')
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df['efficiency_median']*100,
+            mode='lines',
+            name = "Efficiency median [%]",
+            line=dict(width=2, color='DarkSlateGrey', dash='dot')
         ))
 
     fig.add_trace(go.Scatter(
@@ -380,7 +419,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
         fig.show()
     return df
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False)
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[4], vertical_hover=True)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[89], vertical_hover=True)
 
 ids = np.random.choice(vehicle_ids, 5, replace=False)
 for id in ids:
@@ -389,6 +428,7 @@ for id in ids:
 
 
 # Show the top 10 vehicles with the most charging sessions, where battery capacity >= 40 kWh
+DFV = []
 indx = D2['capacity_kwh'] >= 40
 vehicles_sorted = D2['VEHICLE_ID'][indx].value_counts().index
 bad_ids = [11015, 17035] # +14617, Hardcoded bad ids. Why are they bad? Because charging is "done" way outside of the times of which the vehicle is plugged in.
@@ -398,8 +438,20 @@ for id in vehicles_sorted[:N]:
         print("    [Skipping vehicle", id, "]")
         continue
     print("Plotting vehicle", id)
-    dfv = PlotChargingProfile(D2, id=id, df_only=False)
-    print(dfv.CableCapacity[1], "\n")
+    dfv = PlotChargingProfile(D2, id=id, df_only=True)
+    DFV.append(dfv)
+
+
+# Export chosen vehicles in the DFV list
+
+# Export list of vehicles
+with open('data/MPC-ready/df_vehicle_list.pkl', 'wb') as f:
+    pickle.dump(DFV, f)
+
+
+
+# Make a new script for doing the juicy stuff
+
 
 
 ############## What I need - how I need it  ###############################################
