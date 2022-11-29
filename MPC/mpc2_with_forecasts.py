@@ -18,21 +18,26 @@ import os
 os.chdir('/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/code_Smart_Charging/MPC')
 from FunctionCollection import PerfectForesight, plot_EMPC, DumbCharge
 os.chdir('/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge')
-runMany = False
+runMany = True
+use_carnot = True
 
 # Read the dfp and dft and dfspot
 dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
 dft = pd.read_csv('data/MPC-ready/df_trueprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
-dfk = pd.read_csv('data/MPC-ready/df_knownprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
+#dfk = pd.read_csv('data/MPC-ready/df_knownprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
 dfspot = pd.read_csv('data/spotprice/df_spot_commontime.csv', sep=',', header=0, parse_dates=True)
 trueprice = dfspot['TruePrice'].to_numpy()
 
 dft['Atime'] = pd.to_datetime(dft['Atime'], format='%Y-%m-%d %H:%M:%S')
 dfp['Atime'] = pd.to_datetime(dfp['Atime'], format='%Y-%m-%d %H:%M:%S')
-dfk['Atime'] = pd.to_datetime(dfk['Atime'], format='%Y-%m-%d %H:%M:%S')
+#dfk['Atime'] = pd.to_datetime(dfk['Atime'], format='%Y-%m-%d %H:%M:%S')
 dfspot['Time'] = pd.to_datetime(dfspot['Time'], format='%Y-%m-%d %H:%M:%S')
 starttime = str(dfspot['Time'][0].date())
 endtime = str(dfspot['Time'].iloc[-1].date())
+
+
+
+
 
 ######### External variables from EV USE (SIMULATED)
 plugin = 17.25; plugout = 7.15;

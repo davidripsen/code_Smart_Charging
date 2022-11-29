@@ -21,7 +21,7 @@ dfB.index = dfB.index +1 # VEHICLE_ID is index but starts at 1.
 dfC1 = pd.read_csv('data/Monta/charges_extract_1.csv', header=0, parse_dates=True, low_memory=False)
 dfC2 = pd.read_csv('data/Monta/charges_extract_2.csv', header=0, parse_dates=True, low_memory=False)
 dfC3 = pd.read_csv('data/Monta/charges_extract_3.csv', header=0, parse_dates=True, low_memory=False)
-spot = pd.read_csv('data/spotprice/df_spot_since_sept22.csv')
+spot = pd.read_csv('data/spotprice/df_spot_2022.csv')
 D = pd.concat([dfC1, dfC2, dfC3], ignore_index=True)
 #del dfC1, dfC2, dfC3
 
@@ -104,7 +104,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
         zeros = np.zeros(len(times))
         nans = np.full(len(times), np.nan)
         # Create a dataframe with these times and zeros
-        df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans, 'SOCmin': nans, 'BatteryCapacity': nans, 'CableCapacity': nans, 'efficiency': nans})
+        df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans, 'SOCmin': nans, 'SOCmax': nans, 'BatteryCapacity': nans, 'CableCapacity': nans, 'efficiency': nans})
         df['time'] = df['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
         df.z_plan, df.z_act = -1, -1
         # Set the index to be the time
@@ -147,6 +147,9 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
             # Add SOC and convert to kWhs
             df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'].ceil('H'), 'SOC'] = D2v.iloc[i]['SOC_START']/100 * D2v.iloc[i]['capacity_kwh']
             df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOC'] = D2v.iloc[i]['SOC']/100 * D2v.iloc[i]['capacity_kwh']
+
+            # Add SOCmax
+            df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['PLANNED_PICKUP_AT'], 'SOCmax'] = D2v.iloc[i]['SOC_LIMIT']/100 * D2v.iloc[i]['capacity_kwh']
 
             # bmin (PURELY ASSUMPTION)
             min_charged = 0.4 # 40% of battery capacity
@@ -314,10 +317,10 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
     ))
 
     fig.add_trace(go.Scatter(
-        x=D2v['PLANNED_PICKUP_AT'],
-        y=D2v['SOC_LIMIT']/100 * D2v['capacity_kwh'],
-        mode='lines+markers',
-        name = "SOC limit",
+        x=df.index,
+        y=df['SOCmax'],
+        mode='lines',
+        name = "SOC max [kWh]",
         line=dict(width=2, color='grey') #color='DarkSlateGrey')
         # Add index value to hovertext
         # hovertext = df.index
@@ -418,6 +421,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
     if not df_only:
         fig.show()
     return df
+    
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[89], vertical_hover=True)
 
@@ -440,9 +444,6 @@ for id in vehicles_sorted[:N]:
     print("Plotting vehicle", id)
     dfv = PlotChargingProfile(D2, id=id, df_only=True)
     DFV.append(dfv)
-
-
-# Export chosen vehicles in the DFV list
 
 # Export list of vehicles
 with open('data/MPC-ready/df_vehicle_list.pkl', 'wb') as f:
