@@ -13,46 +13,77 @@ import json
 import datetime
 pd.set_option('display.max_rows', 500)
 
-# Read EV user data
-df = pd.read_csv('data/Monta/2022_11_03 10_15.csv', sep=',', header=0, parse_dates=True) # All charges
-df2 = pd.read_csv('data/Monta/charge_smart_charges.csv', sep=',', header=0, parse_dates=True) # Smart Charges.    Can be mapped to All Charges on df2.id == df.Smart_Charge_ID
-df_vis = pd.read_excel('data/Monta/core.core_charges.xlsx')
-#dfA1 = pd.read_csv('data/Monta/charges_part1.csv', sep=',', header=0, parse_dates=True, low_memory=False)
-#dfA2 = pd.read_csv('data/Monta/charges_part2.csv', sep=',', header=0, parse_dates=True, low_memory=False)
-#dfA3 = pd.read_csv('data/Monta/charges_part3.csv', sep=',', header=0, parse_dates=True, low_memory=False)
-# A2, A1, A3
-#df3 = pd.concat([dfA1, dfA2, dfA3], ignore_index=True)
+# # Read EV user data
+# df = pd.read_csv('data/Monta/2022_11_03 10_15.csv', sep=',', header=0, parse_dates=True) # All charges
+# df2 = pd.read_csv('data/Monta/charge_smart_charges.csv', sep=',', header=0, parse_dates=True) # Smart Charges.    Can be mapped to All Charges on df2.id == df.Smart_Charge_ID
+# df_vis = pd.read_excel('data/Monta/core.core_charges.xlsx')
+# #dfA1 = pd.read_csv('data/Monta/charges_part1.csv', sep=',', header=0, parse_dates=True, low_memory=False)
+# #dfA2 = pd.read_csv('data/Monta/charges_part2.csv', sep=',', header=0, parse_dates=True, low_memory=False)
+# #dfA3 = pd.read_csv('data/Monta/charges_part3.csv', sep=',', header=0, parse_dates=True, low_memory=False)
+# # A2, A1, A3
+# #df3 = pd.concat([dfA1, dfA2, dfA3], ignore_index=True)
 
 
-# Convert to datetime
-timevars = ['CABLE_PLUGGED_IN_AT', 'RELEASED_AT', 'STARTING_AT', 'COMPLETED_AT', 'CHARGE_TIME']
+# # Convert to datetime
+# timevars = ['CABLE_PLUGGED_IN_AT', 'RELEASED_AT', 'STARTING_AT', 'COMPLETED_AT', 'CHARGE_TIME']
+# for var in timevars:
+#     df[var] = pd.to_datetime(df[var], format='%Y-%m-%d %H:%M:%S')
+
+# timevars = ['start_time', 'stop_time', 'calculated_start_at', 'created_at', 'updated_at']
+# for var in timevars:
+#     df2[var] = pd.to_datetime(df2[var], format='%Y-%m-%d %H:%M:%S')
+
+# # Show df
+# df
+# print("Columns: ", df.columns)
+# df.iloc[5]
+
+# # Show df2
+# df2
+# print("Columns: ", df2.columns)
+# df2.iloc[43]
+
+# ##### Join df and df2 where df2.id == df.SMART_CHARGE_ID
+#     #df2.id.isin(df.SMART_CHARGE_ID).mean() # The majority of Smart Charges are also in df (All Charges)
+# D = df2.merge(df, left_on='id', right_on='SMART_CHARGE_ID', how='left')
+# D = D.dropna(subset=['CABLE_PLUGGED_IN_AT'])
+# D
+
+# # Show df3
+# df3
+# df3.iloc[44]
+
+
+dfB = pd.read_csv('data/Monta/vehicles.csv', header=0, index_col=None)
+dfB.index = dfB.index +1 # VEHICLE_ID is index but starts at 1.
+dfC1 = pd.read_csv('data/Monta/charges_extract_1.csv', header=0, parse_dates=True, low_memory=False)
+dfC2 = pd.read_csv('data/Monta/charges_extract_2.csv', header=0, parse_dates=True, low_memory=False)
+dfC3 = pd.read_csv('data/Monta/charges_extract_3.csv', header=0, parse_dates=True, low_memory=False)
+spot = pd.read_csv('data/spotprice/df_spot_2022.csv')
+D = pd.concat([dfC1, dfC2, dfC3], ignore_index=True)
+#del dfC1, dfC2, dfC3
+
+# Join dfB and D on dfb['id'] = D['vehicle_id']
+D = D.merge(dfB, left_on='VEHICLE_ID', right_on=dfB.index, how='left')
+
+# Convert to datetime and Copenhagen Time
+timevars = ['CABLE_PLUGGED_IN_AT', 'RELEASED_AT', 'STARTING_AT', 'COMPLETED_AT', 'PLANNED_PICKUP_AT', 'ESTIMATED_COMPLETED_AT', 'LAST_START_ATTEMPT_AT','CHARGING_AT','STOPPED_AT']
 for var in timevars:
-    df[var] = pd.to_datetime(df[var], format='%Y-%m-%d %H:%M:%S')
+    D[var] = pd.to_datetime(D[var], format='%Y-%m-%d %H:%M:%S')
+    # Convert from UTC to Copenhagen Time
+    D[var] = D[var].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
+    D[var] = pd.to_datetime(D[var], format='%Y-%m-%d %H:%M:%S')
 
-timevars = ['start_time', 'stop_time', 'calculated_start_at', 'created_at', 'updated_at']
-for var in timevars:
-    df2[var] = pd.to_datetime(df2[var], format='%Y-%m-%d %H:%M:%S')
+df_spot = pd.DataFrame({'time': spot['HourUTC'], 'trueprice': spot['SpotPriceDKK']/1000})
+df_spot['time'] = pd.to_datetime(df_spot['time'], format='%Y-%m-%d %H:%M:%S')
+df_spot = df_spot.set_index('time')
+df_spot.index = df_spot.index.tz_localize('UTC').tz_convert('Europe/Copenhagen')
 
-# Show df
-df
-print("Columns: ", df.columns)
-df.iloc[5]
-
-# Show df2
-df2
-print("Columns: ", df2.columns)
-df2.iloc[43]
-
-##### Join df and df2 where df2.id == df.SMART_CHARGE_ID
-    #df2.id.isin(df.SMART_CHARGE_ID).mean() # The majority of Smart Charges are also in df (All Charges)
-D = df2.merge(df, left_on='id', right_on='SMART_CHARGE_ID', how='left')
-D = D.dropna(subset=['CABLE_PLUGGED_IN_AT'])
-D
-
-# Show df3
-df3
-df3.iloc[44]
-# Hmmm... Plug-in og plug-out are only dates, not times :-(
+# Let's take a look at the data where SOC is available AND we are SMART CHARGING
+D2 = D[D['SOC'].notna()]
+df = D2[D2['SMART_CHARGE_ID'].notna()]
+print("Disregarding ", round((1-(len(D2)/len(D))),4) *100, " % of the data where SOC is not available or we are not smart charging")
+df.iloc[44]
 
 
 ###################################################################################
@@ -109,7 +140,7 @@ plot_weekly_plugtimes(df, 'CABLE_PLUGGED_IN_AT', "Weekly pattern of CABLE_PLUGGE
 plot_weekly_plugtimes(df, 'RELEASED_AT', "Weekly pattern of RELEASED_AT", "Day of week", "Counts")
 
 # Plot diurnal-weekly pattern of plug-in and plug-out times
-def plot_diurnal_weekly_plugtimes(df, var, title, xlab, ylab):
+def plot_diurnal_weekly_plugtimes(df, var, title, xlab, ylab, export=False):
     fig = go.Figure(data=[go.Histogram2d(y=df[var].dt.hour, x=df[var].dt.weekday)])
     fig.update_layout(
         title_text=title, # title of plot
@@ -122,8 +153,14 @@ def plot_diurnal_weekly_plugtimes(df, var, title, xlab, ylab):
     fig.update_xaxes(ticktext=['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], tickvals=[0, 1, 2, 3, 4, 5, 6])
     fig.show()
 
-plot_diurnal_weekly_plugtimes(df, 'CABLE_PLUGGED_IN_AT', "Diurnal-weekly pattern of CABLE_PLUGGED_IN_AT", "Day of week", "Hour of day")
-plot_diurnal_weekly_plugtimes(df, 'RELEASED_AT', "Diurnal-weekly pattern of RELEASED_AT", "Day of week", "Hour of day")
+    # Export figure
+    if export:
+        fig.write_html( "plots/EV_Monta/diurnal_weekly_" + var + ".html")
+        fig.write_image("plots/EV_Monta/diurnal_weekly_" + var + ".pdf", scale=2)
+
+plot_diurnal_weekly_plugtimes(df, 'CABLE_PLUGGED_IN_AT', "Daily-weekly pattern of CABLE_PLUGGED_IN_AT by SmartCharge users", "Day of week", "Hour of day", export=True)
+plot_diurnal_weekly_plugtimes(df, 'PLANNED_PICKUP_AT', "Daily-weekly pattern of PLANNED_PICKUP_AT by SmartCharge users", "Day of week", "Hour of day", export=True)
+plot_diurnal_weekly_plugtimes(df, 'RELEASED_AT', "Daily-weekly pattern of RELEASED_AT by SmartCharge users", "Day of week", "Hour of day", export=True)
 
 # Histogram of df['KWH']
 fig = go.Figure(data=[go.Histogram(x=df['KWH'])])

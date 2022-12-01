@@ -61,7 +61,7 @@ def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, starttime='
 
     # add "Days" to x-axis
     # Add total cost to title
-    fig.update_layout(title=name + "    MPC of EVs (simulated consumer data)        from " + starttime +" to "+ endtime+"      Total cost: " + str(round(obj)) + " DKK (+tariffs)",
+    fig.update_layout(title=name + "    MPC of EVs        from " + starttime +" to "+ endtime+"      Total cost: " + str(round(obj)) + " DKK  (+tariffs)",
         xaxis_title="Days",
         yaxis_title="kWh or DKK/kWh")
     fig.show()

@@ -14,7 +14,7 @@ import matplotlib.backends.backend_pdf
 import seaborn as sns
 sns.set_theme()
 pd.set_option('display.max_rows', 500)
-plot = True
+plot = False
 plot_alot = False
 use_carnot = True
 
@@ -232,7 +232,7 @@ minH = df['Atime'].value_counts().min()
 ##############################################################################
 # Change df into MPC-friendly format with constant timesteps
 ##############################################################################
-h = 145 # horizon: t = 0..h
+h = 200 # horizon: t = 0..h
 BigM = int(25000)  # BigM padding value for padding forecasts [EUR/MWh]
 
 def SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=None, BigM=20000):
