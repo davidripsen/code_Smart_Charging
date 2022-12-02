@@ -24,7 +24,6 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, verbose=Tr
         prob += b[t+1] <= bmax
         prob += x[t] <= xmax*z[t]
         prob += x[t] >= 0
-                # Debugging tips: Du kan ikke constrainte en variabels startpunkt, når startpunktet har fået en startværdi.
 
     # Solve problem
     if verbose:
@@ -34,6 +33,45 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, verbose=Tr
 
     # Return results
     return(prob, x, b)
+
+def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r, verbose=True):
+        # Init problem 
+    prob = LpProblem("mpc1", LpMinimize)
+
+    # Init variabless
+    x = LpVariable.dicts("x", tvec, lowBound=0, upBound=xmax, cat='Continuous')
+    b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=bmax, cat='Continuous')
+    b[0] = b0
+
+    # Objective
+    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * ((b[T+1])-b[0]))
+
+    # Constraints
+    for t in tvec:
+        prob += b[t+1] == b[t] + x[t] - u[t]
+        prob += b[t+1] >= bmin[t+1]
+        prob += b[t+1] <= bmax
+        prob += x[t] <= xmax*z[t]
+        prob += x[t] >= 0
+
+        # Noget med at logge b relativt til u
+        # men faktisk optimise over b_forecast[t+1] = b_forecast[t] + x[t] - u_forecast[t]
+        # returne de tilhørende x[t]
+        # og bare kører logbog over b relativt til sande u'er.
+        # det er denne b, der skal visualiseres.
+        # Næste iterations b0 = b[0]  , således vi bruger den sande u.
+    
+    # Ift. c (priser), kan man måske også diskontere forecasts der ligger langt væk?
+
+    # Solve problem
+    if verbose:
+        prob.solve()
+    else:
+        prob.solve(PULP_CBC_CMD(msg=0))
+
+    # Return results
+    return(prob, x, b)
+
 
 def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, starttime='', endtime='', export=False, BatteryCap=60):
         # Identify iterative-appended, self-made prob

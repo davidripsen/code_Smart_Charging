@@ -55,7 +55,7 @@ dfv = dfv[(dfv.index >= starttime) & (dfv.index <= endtime)].reset_index(drop=Tr
 dfp.Atime_diff.value_counts() # Up to 66 hours between forecasts
 
 # Choice of fit for use
-u_fit = 'use_ewm' # 'use_ewm': Exponential weighted moving average
+u_fit = 'use' # 'use_ewm': Exponential weighted moving average
 
 #### Extract EV usage from Monta data #######
 # Use
@@ -133,6 +133,10 @@ def MultiDay(dfp, dfspot, u, z, h, b0, bmax, bmin, xmax, c_tilde, maxh=5*24):
             # Find relevant input at the specific hours of flexibility
             z_i = z[tvec_i]
             u_i = u[tvec_i]
+            
+            ## Forecast use, not just foresight it
+            #u_i = np.repeat(u-rolling-mean[k], len(tvec_i))
+
             bmin_i = bmin[np.append(tvec_i, tvec_i[-1]+1)]
 
             # Solve

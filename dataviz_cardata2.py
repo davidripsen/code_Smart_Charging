@@ -104,7 +104,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
         zeros = np.zeros(len(times))
         nans = np.full(len(times), np.nan)
         # Create a dataframe with these times and zeros
-        df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans, 'SOCmin': nans, 'SOCmax': nans, 'BatteryCapacity': nans, 'CableCapacity': nans, 'efficiency': nans})
+        df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_plan_everynight':zeros,'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans, 'SOCmin': nans, 'SOCmax': nans, 'BatteryCapacity': nans, 'CableCapacity': nans, 'efficiency': nans})
         df['time'] = df['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
         df.z_plan, df.z_act = -1, -1
         # Set the index to be the time
@@ -119,6 +119,11 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
             # Set z=1 for all times from plug-in to plug-out
             df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['PLANNED_PICKUP_AT'], 'z_plan'] = 1 #i=2, ser ud til at være fucked, når CABLE_PLUGGED_IN_AT IKKE er heltal.
             df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['RELEASED_AT'], 'z_act'] = 1
+
+            # If df.index time is between 22 and 6 then also set z_plan=1
+            df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['PLANNED_PICKUP_AT'], 'z_plan_everynight'] = 1
+            df.loc[(df.index.time >= datetime.time(22,0)) & (df.index.time <= datetime.time(6,0)), 'z_plan_everynight'] = 1
+                # VIRKER DET HER KODE?
 
             # Allow semi-discrete plug-in relative to proportion of the hour
             #df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'], 'z_plan'] = 1
@@ -152,8 +157,8 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
             df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['PLANNED_PICKUP_AT'], 'SOCmax'] = D2v.iloc[i]['SOC_LIMIT']/100 * D2v.iloc[i]['capacity_kwh']
 
             # bmin (PURELY ASSUMPTION)
-            min_charged = 0.4 # 40% of battery capacity
-            min_alltime = 0.05 # Never go below 10%
+            min_charged = 0.40 # 40% of battery capacity
+            min_alltime = 0.05 # Never go below 5%
             df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOCmin'] = min_charged * df['BatteryCapacity'][i] # Min SOC
             df['SOCmin'] = df['SOCmin'].fillna(min_alltime * df['BatteryCapacity'][i])
 
@@ -190,11 +195,14 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
         df['use_ewm'] = df[df['use_lin'] != 0]['use_lin'].ewm(span=roll_length*24, min_periods=24).mean()
         df['use_ewm'] = df['use_ewm'].fillna(0)
 
+        # 
+
         # Median prediction of efficiency
         df['efficiency_median'] = df['efficiency'].median()
 
         # Add vehicle id
         df['vehicle_id'] = id
+
     else:
         df = df_vehicle
 
@@ -423,7 +431,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
     return df
     
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False)
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[89], vertical_hover=True)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[89], vertical_hover=False)
 
 ids = np.random.choice(vehicle_ids, 5, replace=False)
 for id in ids:
