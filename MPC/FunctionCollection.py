@@ -5,7 +5,7 @@ from pulp import *
 import numpy as np
 import plotly.graph_objects as go
 
-def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, verbose=True):
+def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbose=True):
         # Init problem 
     prob = LpProblem("mpc1", LpMinimize)
 
@@ -22,7 +22,7 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, verbose=Tr
         prob += b[t+1] == b[t] + x[t] - u[t]
         prob += b[t+1] >= bmin[t+1]
         prob += b[t+1] <= bmax
-        prob += x[t] <= xmax*z[t]
+        prob += x[t] <= xmax * r * z[t]
         prob += x[t] >= 0
 
     # Solve problem
@@ -34,7 +34,7 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, verbose=Tr
     # Return results
     return(prob, x, b)
 
-def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r, verbose=True):
+def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u_t_true, u_forecast, z, T, tvec, r, verbose=True):
         # Init problem 
     prob = LpProblem("mpc1", LpMinimize)
 
@@ -48,10 +48,10 @@ def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r, verbo
 
     # Constraints
     for t in tvec:
-        prob += b[t+1] == b[t] + x[t] - u[t]
+        prob += b[t+1] == b[t] + x[t] - u_forecast[t]
         prob += b[t+1] >= bmin[t+1]
         prob += b[t+1] <= bmax
-        prob += x[t] <= xmax*z[t]
+        prob += x[t] <=   xmax * r * z[t]
         prob += x[t] >= 0
 
         # Noget med at logge b relativt til u
@@ -68,6 +68,10 @@ def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r, verbo
         prob.solve()
     else:
         prob.solve(PULP_CBC_CMD(msg=0))
+
+    # Update b1 with actual use (relative to what we chose to charge)
+    b[1] = b[0] + x[0] - u_t_true
+    prob.assignVarsVals({'b_1': b[1]})
 
     # Return results
     return(prob, x, b)

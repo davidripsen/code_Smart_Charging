@@ -104,7 +104,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
         zeros = np.zeros(len(times))
         nans = np.full(len(times), np.nan)
         # Create a dataframe with these times and zeros
-        df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_plan_everynight':zeros,'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans, 'SOCmin': nans, 'SOCmax': nans, 'BatteryCapacity': nans, 'CableCapacity': nans, 'efficiency': nans})
+        df = pd.DataFrame({'time': times, 'z_plan': zeros, 'z_act': zeros, 'charge': zeros, 'price': nans, 'SOC': nans, 'SOCmin': nans, 'SOCmax': nans, 'BatteryCapacity': nans, 'CableCapacity': nans, 'efficiency': nans})
         df['time'] = df['time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
         df.z_plan, df.z_act = -1, -1
         # Set the index to be the time
@@ -119,11 +119,6 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
             # Set z=1 for all times from plug-in to plug-out
             df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['PLANNED_PICKUP_AT'], 'z_plan'] = 1 #i=2, ser ud til at være fucked, når CABLE_PLUGGED_IN_AT IKKE er heltal.
             df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['RELEASED_AT'], 'z_act'] = 1
-
-            # If df.index time is between 22 and 6 then also set z_plan=1
-            df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['PLANNED_PICKUP_AT'], 'z_plan_everynight'] = 1
-            df.loc[(df.index.time >= datetime.time(22,0)) & (df.index.time <= datetime.time(6,0)), 'z_plan_everynight'] = 1
-                # VIRKER DET HER KODE?
 
             # Allow semi-discrete plug-in relative to proportion of the hour
             #df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'], 'z_plan'] = 1
@@ -162,6 +157,12 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
             df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOCmin'] = min_charged * df['BatteryCapacity'][i] # Min SOC
             df['SOCmin'] = df['SOCmin'].fillna(min_alltime * df['BatteryCapacity'][i])
 
+
+        # If z_plan_everynight
+        df['z_plan_everynight'] = df['z_plan']
+        df.loc[(df.index.hour >= 22) | (df.index.hour < 6), 'z_plan_everynight'] = 1
+
+        # Costs
         df['costs'] = df['price'] * df['charge']
         df = df.merge(df_spot, how='left', left_on='time', right_on='time')
         
@@ -221,6 +222,15 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
     fig.add_trace(go.Scatter(
         x=df.index,
         y=df['z_plan'],
+        mode='lines',
+        name='Plugged-in (planned) [true/false]',
+        line=dict(
+            color='black',
+    )))
+
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df['z_plan_everynight'],
         mode='lines',
         name='Plugged-in (planned) [true/false]',
         line=dict(
