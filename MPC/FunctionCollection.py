@@ -77,7 +77,7 @@ def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u_t_true, u_forecast, z
     return(prob, x, b)
 
 
-def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, starttime='', endtime='', export=False, BatteryCap=60):
+def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, z=np.nan, starttime='', endtime='', export=False, BatteryCap=60, firsthour=0):
         # Identify iterative-appended, self-made prob
     fig = go.Figure()
     if type(prob) == dict:
@@ -87,6 +87,7 @@ def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, starttime='
         fig.add_trace(go.Scatter(x=tvec, y=[value(prob['u'][t]) for t in tvec], mode='lines', name='Use'))
         fig.add_trace(go.Scatter(x=tvec, y=[value(prob['x'][t]) for t in tvec], mode='lines', name='Charging'))
         fig.add_trace(go.Scatter(x=tvec, y=[value(prob['c'][t]) for t in tvec], mode='lines', name='True Price'))
+        fig.add_trace(go.Scatter(x=tvec, y=[prob['z'][t]*2-1 for t in tvec], mode='lines', name='Plugged-in', line=dict(color='black', width=0.5)))
         obj = prob['objective']
     else:
         tvec = np.arange(0, len(x))
@@ -96,8 +97,10 @@ def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, starttime='
         fig.add_trace(go.Scatter(x=tvec, y=[value(u[t]) for t in tvec], mode='lines', name='Use'))
         fig.add_trace(go.Scatter(x=tvec, y=[value(x[t]) for t in tvec], mode='lines', name='Charging'))
         fig.add_trace(go.Scatter(x=tvec, y=[value(c[t]) for t in tvec], mode='lines', name='True Price'))
+        fig.add_trace(go.Scatter(x=tvec, y=[z[t]*2-1 for t in tvec], mode='lines', name='Plugged-in',  line=dict(color='black', width=0.5)))
     
-    fig.update_xaxes(tickvals=tvec_b[::24], ticktext=[str(t//24) for t in tvec_b[::24]])
+    fig.update_xaxes(tickvals=tvec_b[::24]+firsthour, ticktext=[str(t//24) for t in tvec_b[::24]+firsthour])
+
     # Fix y-axis to lie between 0 and 65
     fig.update_yaxes(range=[-3, BatteryCap+2])
 

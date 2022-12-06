@@ -93,7 +93,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
         id = int(id)
 
         firsttime = D2v['CABLE_PLUGGED_IN_AT'].min().date() - datetime.timedelta(days=1)
-        lasttime = D2v['PLANNED_PICKUP_AT'].max().date() + datetime.timedelta(days=1)
+        lasttime = max( D2v['PLANNED_PICKUP_AT'].max().date(), D2v['RELEASED_AT'].max().date()) + datetime.timedelta(days=1)
 
         assert len(D2v.capacity_kwh.unique()) == 1, "Battery capacity changes for vehicle " + str(id)
         assert len(D2v.max_kw_ac.unique()) == 1, "Cable capacity changes for vehicle " + str(id)
@@ -134,7 +134,8 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
 
             # Efficiency of charging (ratio of what has been charged to what goes into the battery)
             #if D2v.iloc[i]['KWH'] >= 1: # Only proper charging
-            df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['RELEASED_AT'], 'efficiency'] = ((D2v.iloc[i].SOC - D2v.iloc[i].SOC_START) / 100 * D2v.iloc[i]['capacity_kwh']) / D2v.iloc[i].KWH
+            if D2v.iloc[i]['KWH'] > 0:
+                df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['RELEASED_AT'], 'efficiency'] = ((D2v.iloc[i].SOC - D2v.iloc[i].SOC_START) / 100 * D2v.iloc[i]['capacity_kwh']) / D2v.iloc[i].KWH
 
             # Add the right spot prices to df
             if type(D2v.iloc[i]['SPOT_PRICES']) == str and len(eval(D2v.iloc[i]['SPOT_PRICES'])) != 0:
@@ -145,22 +146,27 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
                 df.loc[prices.index, 'price'] = prices['value']
             
             # Add SOC and convert to kWhs
-            df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'].ceil('H'), 'SOC'] = D2v.iloc[i]['SOC_START']/100 * D2v.iloc[i]['capacity_kwh']
+            df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT'].ceil('H', ambiguous=bool), 'SOC'] = D2v.iloc[i]['SOC_START']/100 * D2v.iloc[i]['capacity_kwh']
             df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOC'] = D2v.iloc[i]['SOC']/100 * D2v.iloc[i]['capacity_kwh']
 
             # Add SOCmax
             df.loc[D2v.iloc[i]['CABLE_PLUGGED_IN_AT']:D2v.iloc[i]['PLANNED_PICKUP_AT'], 'SOCmax'] = D2v.iloc[i]['SOC_LIMIT']/100 * D2v.iloc[i]['capacity_kwh']
 
-            # bmin (PURELY ASSUMPTION)
+            # bmin (PURELY INPUT ASSUMPTION)
             min_charged = 0.40 # 40% of battery capacity
             min_alltime = 0.05 # Never go below 5%
             df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOCmin'] = min_charged * df['BatteryCapacity'][i] # Min SOC
             df['SOCmin'] = df['SOCmin'].fillna(min_alltime * df['BatteryCapacity'][i])
 
 
-        # If z_plan_everynight
+        # If z_plan_everynight and corresponding bmin
+        # z_plan_everynight:
         df['z_plan_everynight'] = df['z_plan']
         df.loc[(df.index.hour >= 22) | (df.index.hour < 6), 'z_plan_everynight'] = 1
+
+        # bmin_everymorning:
+        df['SOCmin_everymorning'] = df['SOCmin']
+        df.loc[(df.index.hour == 6), 'SOCmin_everymorning'] = min_charged * df['BatteryCapacity']
 
         # Costs
         df['costs'] = df['price'] * df['charge']
@@ -196,13 +202,16 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
         df['use_ewm'] = df[df['use_lin'] != 0]['use_lin'].ewm(span=roll_length*24, min_periods=24).mean()
         df['use_ewm'] = df['use_ewm'].fillna(0)
 
-        # 
-
         # Median prediction of efficiency
         df['efficiency_median'] = df['efficiency'].median()
 
         # Add vehicle id
         df['vehicle_id'] = id
+
+        # Assure non-Nan at crucial places
+        if any(df['use'].isna()):
+            df = df[~df['use_lin'].isna()]
+            print('Rows with NaNs in Use were deleted.')
 
     else:
         df = df_vehicle
@@ -396,7 +405,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
 
     fig.add_trace(go.Scatter(
     x=df.index,
-    y=df['SOCmin'],
+    y=df['SOCmin_everymorning'],
     mode='lines',
     name = "Input: Minimum SOC (assumption)",
     line=dict(
@@ -446,14 +455,14 @@ dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[89], vertical_hov
 ids = np.random.choice(vehicle_ids, 5, replace=False)
 for id in ids:
     print("Plotting vehicle", id)
-    dfv = PlotChargingProfile(D2, id=id)
+    dfv = PlotChargingProfile(D2, id=id, df_only=True)
 
 
 # Show the top 10 vehicles with the most charging sessions, where battery capacity >= 40 kWh
 DFV = []
 indx = D2['capacity_kwh'] >= 40
 vehicles_sorted = D2['VEHICLE_ID'][indx].value_counts().index
-bad_ids = [11015, 17035] # +14617, Hardcoded bad ids. Why are they bad? Because charging is "done" way outside of the times of which the vehicle is plugged in.
+bad_ids = [] # No bad ids :-)
 N = 10 + len(bad_ids)
 for id in vehicles_sorted[:N]:
     if id in bad_ids:
