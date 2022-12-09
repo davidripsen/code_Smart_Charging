@@ -19,10 +19,10 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbo
 
     # Constraints
     for t in tvec:
-        prob += b[t+1] == b[t] + x[t] - u[t]
+        prob += b[t+1] == b[t] + x[t]*r - u[t]
         prob += b[t+1] >= bmin[t+1]
         prob += b[t+1] <= bmax
-        prob += x[t] <= xmax * r * z[t]
+        prob += x[t] <= xmax * z[t]
         prob += x[t] >= 0
 
     # Solve problem
@@ -48,20 +48,11 @@ def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u_t_true, u_forecast, z
 
     # Constraints
     for t in tvec:
-        prob += b[t+1] == b[t] + x[t] - u_forecast[t]
+        prob += b[t+1] == b[t] + x[t]*r - u_forecast[t]
         prob += b[t+1] >= bmin[t+1]
         prob += b[t+1] <= bmax
-        prob += x[t] <=   xmax * r * z[t]
+        prob += x[t] <=   xmax * z[t]
         prob += x[t] >= 0
-
-        # Noget med at logge b relativt til u
-        # men faktisk optimise over b_forecast[t+1] = b_forecast[t] + x[t] - u_forecast[t]
-        # returne de tilhørende x[t]
-        # og bare kører logbog over b relativt til sande u'er.
-        # det er denne b, der skal visualiseres.
-        # Næste iterations b0 = b[0]  , således vi bruger den sande u.
-    
-    # Ift. c (priser), kan man måske også diskontere forecasts der ligger langt væk?
 
     # Solve problem
     if verbose:
@@ -115,7 +106,7 @@ def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, z=np.nan, s
     if export:
         fig.write_html( "plots/MPC/" + name + "_mpc.html")
 
-def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
+def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1):
     # Init problem
     prob = LpProblem("mpc1", LpMinimize)
 
@@ -133,7 +124,7 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec):
 
     # Constraints
     for t in tvec:
-        prob += b[t+1] == b[t] + x[t] - u[t]
+        prob += b[t+1] == b[t] + x[t]*r - u[t]
         prob += b[t+1] >= bmin[t+1]
         prob += b[t+1] <= bmax
         

@@ -14,6 +14,9 @@ import datetime as dt
 from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge
 runMany = True
 
+# Read scenarios from txt
+scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenarios_all=scenarios;
+
 # Read the dfp and dft and dfspot
 dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
 dft = pd.read_csv('data/MPC-ready/df_trueprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
@@ -33,7 +36,7 @@ dft['Atime'] = dft['Atime'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhag
 with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
 
-####################### Load each element in the list into a dataframe ############################
+####################### Load each element in the list into a dataframe
 dfv = DFV[0]  #dfv1, dfv2, dfv3, dfv4, dfv5, dfv6, dfv7, dfv8, dfv9 = DFV[1], DFV[2], DFV[3], DFV[4], DFV[5], DFV[6], DFV[7], DFV[8], DFV[9]
 dfv              # Is DFV[3] broke?
 
@@ -78,12 +81,102 @@ xmax = dfv['CableCapacity'].unique()[0]
 c_tilde = np.quantile(dfspot['TruePrice'], 0.2) #min(c[-0:24]) # Value of remaining electricity: lowest el price the past 24h
 
 
+
+
 #################################################### LET'S GO! ########################################################
+
+
+#################################################### RUN ALL THE MODELS ########################################################
+
+
+
+
+# Note: Scenarios as is right now, do not take into account that the uncertainty/scenarios differences are very dependent of time of day.
+
+def StochasticProgram(scenarios, b0, bmax, bmin, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z, tvec, r, l, verbose=True):
+    """
+    Solves the 2-stage stochastic program for a given time horizon T, and returns the optimal solution.
+    l: Length of deterministic prices
+    O: Number of scenarios (Omega)
+    """
+    scenarios = scenarios_all[77:77+10, :]; O=len(scenarios); # for Dev: Antag 2 scenarier
+    #scenarios = scenarios_all
+    O, K = scenarios.shape
+    tvec_d = tvec[0:l] # Deterministic part
+    tvec_s = tvec[l:]  # Stochastic part
+    c_d = c_forecast[:l] # Deterministic part
+    c_s = c_forecast + scenarios # Stochastic part
+
+    # Init problem
+    prob = LpProblem("StochEcoMPC", LpMinimize)
+
+    # Init variabless
+    x_d = LpVariable.dicts("x_d", tvec_d, lowBound=0, upBound=xmax, cat='Continuous')
+    x_s = LpVariable.dicts("x_s", [(t,o) for o in range(O) for t in tvec_s], lowBound=0, upBound=xmax, cat='Continuous') #xs_i,omega
+    b = LpVariable.dicts("b", [(t,o) for o in range(O) for t in np.append(tvec,tvec[-1]+1)], lowBound=0, upBound=bmax, cat='Continuous')
+    # Set initial SOC to b0 for all scenarios o
+    for o in range(O): b[(0,o)] = b0
+
+    # Objective
+    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([1/O * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([1/O * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)])
+
+    # Constraints
+    for t in tvec_d: # Deterministic part
+        for o in range(O):
+            prob += b[(t+1,o)] == b[(t,o)] + x_d[t]*r - u_forecast[t]
+            prob += b[(t+1,o)] >= bmin[t+1]
+            prob += b[(t+1,o)] <= bmax
+            prob += x_d[t] <= xmax * z[t]
+            prob += x_d[t] >= 0
+
+    for t in tvec_s: # Stochastic part
+        for o in range(O):
+            prob += b[(t+1,o)] == b[(t,o)] + x_s[(t,o)]*r - u_forecast[t]
+            prob += b[(t+1,o)] >= bmin[t+1]
+            prob += b[(t+1,o)] <= bmax
+            prob += x_s[(t,o)] <= xmax * z[t]
+            prob += x_s[(t,o)] >= 0
+
+    # Solve problem
+    if verbose:
+        prob.solve()
+    else:
+        prob.solve(PULP_CBC_CMD(msg=0))
+        print("Status:", LpStatus[prob.status])
+
+    #Update b1 with actual use (relative to what we chose to charge) (Should be sufficient only to update b(1,0))
+    for o in range(O):
+        b[1,o] = b[0,o] + value(x_d[0]) - u_t_true
+        prob.assignVarsVals({'b_(1,_'+str(o)+')': b[1,o]})
+        assert b[1,o] == value(b[1,0]), "b(1,o) is not equal to value(b(1,0))"
+        # ^ Most of this code is redundant
+
+    # Return results
+    return(prob, x_d, b, x_s)
+
+prob, x_d, b, x_s = StochasticProgram(scenarios, b0, bmax, bmin, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z, tvec, r, l, verbose=True)
+
+# Print results nicely
+print("Status:", LpStatus[prob.status])
+print("Objective:", value(prob.objective))
+for v in prob.variables():
+    print(v.name, "=", v.varValue)
+
+# Plot the two scenarios
+plt.figure()
+plt.plot(c + scenarios[0,:], label='Scenario 0')
+plt.plot(c + scenarios[1,:], label='Scenario 1')
+plt.show()
+
+
+
+
+
 
 
 #### Tasks:
 # Modify function such that bmax can be a series, not just a scalar
-def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, discountfactor=None, maxh=6*24):
+def MultiDayStochastic(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, discountfactor=None, maxh=6*24):
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
                         # maxh = maximum h of interest ==> to allow comparison on exact same data for different horizons h.
@@ -100,9 +193,9 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, disco
     for i in range(len(dfp)):
         # For each hour until next forecast
         for j in range(dfp['Atime_diff'][i]):
-            if k%50 == 0: print("k = " + str(k) + " of " + str(L-1))
+            if k%50 == 1: print("k = " + str(k) + " of " + str(L-1))
             # Extract forecasts from t=0..h
-            c_forecast = dfp.iloc[i, (j+2):(j+2+h+1)].to_numpy()
+            c_forecast = dfp.iloc[i, (j+2):(j+2+h+1)].to_numpy();
             tvec_i = np.arange(k, k+h+1)
 
             # Find relevant input at the specific hours of flexibility
@@ -113,16 +206,14 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, disco
             #u_forecast = u[tvec_i]  # Snyd: Antag kendt Use
             u_t_true = u[k]
 
-            # if discountfactor is not None:
-            #     # Discounted cost
-            #     c_forecast = c_forecast * np.linspace(1, discountfactor, len(c_forecast))
+            l = 12 # slet
 
             # Solve
-            prob, x, b = ImperfectForesight(b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, h, tvec, r, verbose=False) # Yes, it is tvec=0..h, NOT tvec_i
-    
+            prob, x_d, b, x_s = StochasticProgram(scenarios, b0, bmax, bmin, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z, tvec, r, l, verbose=False)
+
             # Implement/store only the first step, and re-run in next hour
-            x0 = value(x[0]); X[k]=x0;                # Amount charged in the now-hour
-            b1 = value(b[1]); B[k+1]=b1;              # Battery level after the now-hour / beggining of next hour
+            x0 = value(x_d[0]); X[k]=x0;                # Amount charged in the now-hour
+            b1 = value(b[1,0]); B[k+1]=b1;              # Battery level after the now-hour / beggining of next hour
             costs += x0 * c[k];     # Cost of charging in the now-hour
             b0 = b1                                   # Next SOC start is the current SOC
             k += 1
@@ -137,46 +228,6 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, disco
                 return(prob, x, b)
 
 ### Run the problem
-if not runMany:
-    h = 6*24 # 5 days horizon for the multi-day smart charge
-    prob, x, b = MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24)
-    #prob, x, b = MultiDay(dft, dfspot, u, uhat, z, 6*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24) # Snyd: kendte priser
-    plot_EMPC(prob, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
-
-#################################################### RUN ALL THE MODELS ########################################################
-
-
-
-
-### Perfect Foresight
-    # Compare models on the data within horizon
-maxh = 6*24
-L = len(u) - (maxh+1)
-T = L - 1
-tvec = np.arange(T+1)
-T_within = T #-maxh 
-c_within = dfspot['TruePrice'][0:T_within+1] # Actually uses all prices in this case:-)
-tvec_within = tvec[0:T_within+1]
-z_within = z[0:T_within+1]
-u_within = u[0:T_within+1]
-bmin_within = bmin[0:T_within+2]
-
-### Perfect Foresight
-prob, x, b = PerfectForesight(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r, verbose=True)
-plot_EMPC(prob, 'Perfect Foresight   of vehicle = ' + str(vehicle_id), x, b, u_within, c_within, z_within,  starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
-
-### Multi-Day SmartCharge
-if runMany:
-    for h in [i*24 for i in range(1,7)]:
-        print("h = " + str(h))
-        prob, x, b = MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, discountfactor=2, maxh=6*24)
-        plot_EMPC(prob, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour)
-        print("Total cost: " + str(prob['objective']))
-        print("")
-
-### DumbCharge
-prob, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r)
-if LpStatus[prob.status] == 'Optimal':
-    plot_EMPC(prob, 'Dumb Charge   of vehicle = ' + str(vehicle_id), x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
-else:
-    print("DumbCharge failed on this set of simulated data")
+h = 6*24 # 5 days horizon for the multi-day smart charge
+prob, x, b = MultiDayStochastic(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24)
+plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)

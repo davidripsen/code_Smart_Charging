@@ -131,6 +131,9 @@ if plot:
 # Generate 100 samples from the multivariate normal distribution
 samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 100)
 print(samples.shape)
+# Export samples to csv
+np.savetxt("./data/MPC-ready/scenarios.csv", samples, delimiter=",")
+
 
 # Visualise the time series of the samples and add 95 % prediction interval
 if plot:
