@@ -40,17 +40,18 @@ def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u_t_true, u_forecast, z
 
     # Init variabless
     x = LpVariable.dicts("x", tvec, lowBound=0, upBound=xmax, cat='Continuous')
-    b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=bmax, cat='Continuous')
+    b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=bmax*1.25, cat='Continuous')
+    s = LpVariable.dicts("s", tvec, lowBound=0, upBound=0.25*bmax, cat='Continuous') # Add penalizing slack for violating bmax=80%, but still remain below 100%
     b[0] = b0
 
     # Objective
-    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * ((b[T+1])-b[0]))
+    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * ((b[T+1])-b[0]) + [c_tilde*100*s[t] for t in tvec])
 
     # Constraints
     for t in tvec:
         prob += b[t+1] == b[t] + x[t]*r - u_forecast[t]
-        prob += b[t+1] >= bmin[t+1]
-        prob += b[t+1] <= bmax
+        prob += b[t+1] >= bmin[t+1]    # Becomes INFEASIBLE, when b0>bmax og x = 0
+        prob += b[t+1] <= bmax + s[t]  # Punishment slack variable for violating bmax
         prob += x[t] <=   xmax * z[t]
         prob += x[t] >= 0
 
@@ -97,7 +98,8 @@ def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, z=np.nan, s
 
     # add "Days" to x-axis
     # Add total cost to title
-    fig.update_layout(title=name + "    MPC of EVs        from " + starttime +" to "+ endtime+"      Total cost: " + str(round(obj)) + " DKK  (+tariffs)",
+    #fig.update_layout(title=name + "    MPC of EVs        from " + starttime +" to "+ endtime+"      Total cost: " + str(round(obj)) + " DKK  (+tariffs)",
+    fig.update_layout(title=name + "    MPC of EVs        from " + starttime +" to "+ endtime+"      Total cost: " + str(obj) + " DKK  (+tariffs)",
         xaxis_title="Days",
         yaxis_title="kWh or DKK/kWh")
     fig.show()

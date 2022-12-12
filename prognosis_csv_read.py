@@ -152,6 +152,7 @@ for i, atime in enumerate(df.Atime.unique()):
     assert len(knownhours) <= 24 + timezone_change + 24*dfA.DayAhead_avail.iloc[-1], "More than 24 hours of known prices, but not DayAhead_avail"
     # Concat knownhours to dfA
     dfA = pd.concat([pd.DataFrame({'Atime': atime, 'Atime_org': np.nan, 'Time': knownhours, 'PredPrice': np.nan, 'TruePrice_Carnot': np.nan, 'Source': 'nordpool_insert'}), dfA])
+    dfA['l_hours_avail'] = len(knownhours)
 
     # Insert dfA in df
     df = df.drop(df[df['Atime'] == atime].index)
@@ -239,14 +240,17 @@ def SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=None, 
     # Create dataframe with Price as values from df and where Time is split into columns from 0 to 100 and Atime as rows
     if var=='TruePrice': # Ensure for that residuals outside of horizon(forecasts) have a super high residual, not 0.
         BigM = BigM*2
-    df2 = pd.DataFrame(columns=['Atime'] + ['t' + str(i) for i in range(0,h+1)])
+    df2 = pd.DataFrame(columns=['Atime','l_hours_avail'] + ['t' + str(i) for i in range(0,h+1)])
     df2['Atime'] = df['Atime'].unique()
     for Atime in df['Atime'].unique():
+        df2.loc[df2['Atime'] == Atime, 'l_hours_avail'] = int(df.loc[df['Atime'] == Atime, 'l_hours_avail'].iloc[0])
         for i in range(0, h+1):
             vals = df[df['Atime'] == Atime][var].values
             # Pad vals until length h+1 with BigM
             vals = np.pad(vals, (0, np.max([0, h+1 - len(vals)+1]) ), 'constant', constant_values=BigM)
             df2.loc[df2['Atime'] == Atime, 't' + str(i)] = vals[i]
+
+            
 
     # Calculate number of hours until next Atime
     df2['Atime_next'] = df2['Atime'].shift(-1)

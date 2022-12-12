@@ -12,7 +12,7 @@ import plotly.express as px
 import pandas as pd
 import datetime as dt
 from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge
-runMany = True
+runMany = False
 
 # Read the dfp and dft and dfspot
 dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
@@ -83,7 +83,7 @@ c_tilde = np.quantile(dfspot['TruePrice'], 0.2) #min(c[-0:24]) # Value of remain
 
 #### Tasks:
 # Modify function such that bmax can be a series, not just a scalar
-def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, discountfactor=None, maxh=6*24):
+def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, discountfactor=None, maxh=6*24, perfectForesight=False):
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
                         # maxh = maximum h of interest ==> to allow comparison on exact same data for different horizons h.
@@ -102,24 +102,36 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, disco
         for j in range(dfp['Atime_diff'][i]):
             if k%50 == 0: print("k = " + str(k) + " of " + str(L-1))
             # Extract forecasts from t=0..h
-            c_forecast = dfp.iloc[i, (j+2):(j+2+h+1)].to_numpy()
-            tvec_i = np.arange(k, k+h+1)
-
+            c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy()
+            if perfectForesight:
+                c_forecast = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()
+            
             # Find relevant input at the specific hours of flexibility
+            tvec_i = np.arange(k, k+h+1)
             z_i = z[tvec_i]
             bmin_i = bmin[np.append(tvec_i, tvec_i[-1]+1)]
 
             u_forecast = np.repeat(uhat[k], h+1)
-            #u_forecast = u[tvec_i]  # Snyd: Antag kendt Use
+            if perfectForesight:
+                u_forecast = u[tvec_i]  # Snyd: Antag kendt Use
             u_t_true = u[k]
 
             # if discountfactor is not None:
             #     # Discounted cost
             #     c_forecast = c_forecast * np.linspace(1, discountfactor, len(c_forecast))
-
+            
             # Solve
             prob, x, b = ImperfectForesight(b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, h, tvec, r, verbose=False) # Yes, it is tvec=0..h, NOT tvec_i
-    
+            #print("Status:", LpStatus[prob.status])
+            if LpStatus[prob.status] != 'Optimal':
+                print("\n\nPlugged in = ", z[k], z_i[0])
+                print("bmin = ", bmin[k], bmin_i[0])
+                print("u = ", u[k], u_forecast[0])
+                print("b0 = ", b0)
+                print("x = ", value(x[0]), "Trying ", value(x[0])+b0, " <= ", bmax)
+                print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j))
+                print("\n\n\n")
+            
             # Implement/store only the first step, and re-run in next hour
             x0 = value(x[0]); X[k]=x0;                # Amount charged in the now-hour
             b1 = value(b[1]); B[k+1]=b1;              # Battery level after the now-hour / beggining of next hour
@@ -139,9 +151,10 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, disco
 ### Run the problem
 if not runMany:
     h = 6*24 # 5 days horizon for the multi-day smart charge
-    prob, x, b = MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24)
+    prob, x, b = MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=True)
     #prob, x, b = MultiDay(dft, dfspot, u, uhat, z, 6*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24) # Snyd: kendte priser
     plot_EMPC(prob, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+
 
 #################################################### RUN ALL THE MODELS ########################################################
 

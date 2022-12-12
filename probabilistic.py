@@ -101,11 +101,11 @@ if plot:
 # https://scikit-learn.org/stable/modules/covariance.html
 
 # Drop all columns with nan
-df = dfr.iloc[:,2:maxstep+2].to_numpy()
-mu = dfr.iloc[:,2:maxstep+2].mean(numeric_only=True)
+df = dfr.iloc[:,3:maxstep+2].to_numpy()
+mu = dfr.iloc[:,3:maxstep+2].mean(numeric_only=True)
 #cov = ShrunkCovariance(shrinkage=0.1).fit(df).covariance_
 #cov = np.cov(df, rowvar=False)
-cov = dfr.iloc[:,2:maxstep+2].cov()
+cov = dfr.iloc[:,3:maxstep+2].cov()
     # "the sample covariance matrix was singular which can happen from exactly collinearity (as you've said) or when the number of observations is less than the number of variables."
 
 # Visualise mu (and therefore bias)
