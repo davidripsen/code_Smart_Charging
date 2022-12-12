@@ -138,7 +138,7 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1):
 
         # Use i[t] to constraint x[t]
         prob += x[t] <= z[t]*xmax
-        prob += x[t] <= bmax-b[t]
+        prob += x[t] <= bmax-b[t]*r
         prob += x[t] >= (z[t]*xmax - M*(1-i[t])) # i = 1 betyder, at der lades max kapacitet
         prob += x[t] >= (bmax-b[t] - M*i[t])     # i = 0 betyder, at vi kun kan lade de resterende til 100 % SOC
         #prob += i[t] <= z[t]
