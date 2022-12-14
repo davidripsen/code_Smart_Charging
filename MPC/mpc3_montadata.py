@@ -34,8 +34,8 @@ with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
 
 ####################### Load each element in the list into a dataframe ############################
-dfv = DFV[0]  #dfv1, dfv2, dfv3, dfv4, dfv5, dfv6, dfv7, dfv8, dfv9 = DFV[1], DFV[2], DFV[3], DFV[4], DFV[5], DFV[6], DFV[7], DFV[8], DFV[9]
-dfv              # Is DFV[3] broke?
+dfv = DFV[5]  #dfv1, dfv2, dfv3, dfv4, dfv5, dfv6, dfv7, dfv8, dfv9 = DFV[1], DFV[2], DFV[3], DFV[4], DFV[5], DFV[6], DFV[7], DFV[8], DFV[9]
+dfv              # Is DFV[3] broke? Nope:-)
 
 starttime = max(dfspot['Time'][0], dfp['Atime'][0], dfv.index[0])
 endtime = min(dfspot['Time'].iloc[-1], dfp['Atime'].iloc[-1], dfv.index[-1])
@@ -68,6 +68,7 @@ u = dfv[u_var].to_numpy()
 uhat = dfv['use_lin'].to_numpy()
 b0 = dfv['SOC'][0]
 r = dfv['efficiency_median'].unique()[0]
+print(np.sum(u), "==", np.sum(dfv['use']))
 # Input
 bmin = dfv[bmin_var].to_numpy()
 # Vehicle parameters
@@ -83,7 +84,7 @@ c_tilde = np.quantile(dfspot['TruePrice'], 0.2) #min(c[-0:24]) # Value of remain
 
 #### Tasks:
 # Modify function such that bmax can be a series, not just a scalar
-def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, discountfactor=None, maxh=6*24, perfectForesight=False):
+def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=False, discountfactor=None, maxh=6*24, perfectForesight=False):
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
                           # maxh = maximum h of interest ==> to allow comparison on exact same data for different horizons h.
@@ -100,7 +101,16 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, disco
     for i in range(len(dfp)):
         # For each hour until next forecast
         for j in range(dfp['Atime_diff'][i]):
-            if k%50 == 0: print("k = " + str(k) + " of " + str(L-1))
+            if k%50 == 0:
+                print("k = " + str(k) + " of " + str(L-1))
+            
+            if DayAhead:  # If Day-Ahead Smart Charge, disregard h input and use h = l_hours_avail
+                h = dfp['l_hours_avail'][i]-1-j
+                if h<0: 
+                    h=0# Account for missing forecasts
+                    print("Missing forecasts at k=",k,"i=",i,"j=",j, "... Setting h=0")
+                tvec = np.arange(0,h+1)
+
             # Extract forecasts from t=0..h
             c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy()
             if perfectForesight:
@@ -124,11 +134,11 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, disco
             prob, x, b = ImperfectForesight(b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, h, tvec, r, verbose=False) # Yes, it is tvec=0..h, NOT tvec_i
             #print("Status:", LpStatus[prob.status])
             if LpStatus[prob.status] != 'Optimal':
-                print("\n\nPlugged in = ", z[k], z_i[0])
-                print("bmin = ", bmin[k], bmin_i[0])
+                print("\n\nPlugged in = ", z[k],"=", z_i[0])
+                print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
                 print("u = ", u[k], u_forecast[0])
-                print("b0 = ", b0)
-                print("x = ", value(x[0]), "Trying ", value(x[0])+b0, " <= ", bmax)
+                print("b0 = ", b0, "b1 = ", value(b[1]))
+                print("x = ", value(x[0]), "Trying  ", bmin[k+1],"<=", r*value(x[0])+b0-u[k], " <= ", bmax)
                 print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j))
                 print("\n\n\n")
             
@@ -172,24 +182,44 @@ c_within = dfspot['TruePrice'][0:T_within+1] # Actually uses all prices in this 
 tvec_within = tvec[0:T_within+1]
 z_within = z[0:T_within+1]
 u_within = u[0:T_within+1]
+u2_within = dfv['use'].to_numpy()[0:T_within+1]
 bmin_within = bmin[0:T_within+2]
 
 ### Perfect Foresight
 prob, x, b = PerfectForesight(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r, verbose=True)
 plot_EMPC(prob, 'Perfect Foresight   of vehicle = ' + str(vehicle_id), x, b, u_within, c_within, z_within,  starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+    # Verify the objective value
+print("Objective value = ", prob.objective.value())
+print("Objective value = ", np.sum([value(x[t]) * c_within[t] for t in tvec_within]) - c_tilde * (value(b[T+1]) - b[0]))
 
-## Multi-Day SmartCharge
+
+### Day-Ahead SmartCharge
+prob, x, b = MultiDay(dfp, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=True, maxh=6*24, perfectForesight=True)
+plot_EMPC(prob, 'Day-Ahead Smart Charge of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour)
+
+### Multi-Day SmartCharge
 if runMany:
-    for h in [i*24 for i in range(1,7)]:
+    for h in [i for i in [0,1,2,5,12,24,6*24]]: # Hour-ahead Smart Charging
         print("h = " + str(h))
         prob, x, b = MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, perfectForesight=True)
-        plot_EMPC(prob, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour)
+        plot_EMPC(prob, 'Hours-ahead Smart Charge (h = '+str(h)+' hours) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour)
         print("Total cost: " + str(prob['objective']))
         print("")
+
+    # for h in [i*24 for i in range(1,7)]:
+    #     print("h = " + str(h))
+    #     prob, x, b = MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, perfectForesight=True)
+    #     plot_EMPC(prob, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour)
+    #     print("Total cost: " + str(prob['objective']))
+    #     print("")
 
 ### DumbCharge
 prob, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r)
 if LpStatus[prob.status] == 'Optimal':
     plot_EMPC(prob, 'Dumb Charge   of vehicle = ' + str(vehicle_id), x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+        # Verify the objective value
+    print("Objective value = ", prob.objective.value())
+    print("Objective value = ", np.sum([value(x[t]) * c_within[t] for t in tvec_within]) - c_tilde * (value(b[T+1]) - b[0]))
+
 else:
     print("DumbCharge failed on this set of simulated data")

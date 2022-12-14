@@ -183,10 +183,10 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
         df['use'] = u
 
         # Use linearly interpolated SOC
-        u = df.SOC_lin.diff().dropna()
-        u[u>0] = 0
-        u = u.abs()
-        df['use_lin'] = u
+        u_lin = df.SOC_lin.diff().dropna()
+        u_lin[u_lin>0] = 0
+        u_lin = u_lin.abs()
+        df['use_lin'] = u_lin
         # Daily average use
         df['use_dailyaverage'] = df[df['use_lin'] != 0]['use_lin'].mean()
 
@@ -451,6 +451,7 @@ def PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, plot_efficiency=True, ve
     
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13267, vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[89], vertical_hover=False)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, vertical_hover=False)
 
 ids = np.random.choice(vehicle_ids, 5, replace=False)
 for id in ids:
