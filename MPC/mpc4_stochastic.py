@@ -11,12 +11,17 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import datetime as dt
+from sklearn_extra.cluster import KMedoids
 from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge
 pd.set_option('display.max_rows', 500)
 runMany = True
 
 # Read scenarios from txt
 scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenarios_all=scenarios;
+
+# Load pickle file from data/MPC-ready
+with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
+    DFV = pickle.load(f)
 
 # Read the dfp and dft and dfspot
 dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
@@ -32,14 +37,10 @@ dfspot['Time'] = dfspot['Time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Cope
 dfp['Atime'] = dfp['Atime'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
 dft['Atime'] = dft['Atime'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
 
-
-# Load pickle file from data/MPC-ready
-with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
-    DFV = pickle.load(f)
-
-####################### Load each element in the list into a dataframe
-dfv = DFV[3]  #dfv1, dfv2, dfv3, dfv4, dfv5, dfv6, dfv7, dfv8, dfv9 = DFV[1], DFV[2], DFV[3], DFV[4], DFV[5], DFV[6], DFV[7], DFV[8], DFV[9]
-dfv              # Is DFV[3] broke?
+####################### Load each element in the list into a dataframe ############################
+i = 3
+dfv = DFV[i]  #dfv1, dfv2, dfv3, dfv4, dfv5, dfv6, dfv7, dfv8, dfv9 = DFV[1], DFV[2], DFV[3], DFV[4], DFV[5], DFV[6], DFV[7], DFV[8], DFV[9]
+dfv              # Is DFV[3] broke? Fixed:-).
 
 starttime = max(dfspot['Time'][0], dfp['Atime'][0], dfv.index[0])
 endtime = min(dfspot['Time'].iloc[-1], dfp['Atime'].iloc[-1], dfv.index[-1])
@@ -61,6 +62,7 @@ dfv = dfv.reset_index(drop=True)
 ############################################ EXTRACT EV USAGE DATA ####################################################
 # Choice of variables to use
 u_var = 'use_lin' # 'use_lin' or 'use'
+uhat_var = 'use_org_rolling' #
 z_var = 'z_plan_everynight' # 'z_plan': All historical plug-ins (and planned plug-out).  'z_plan_everynight': z_plan + plug-in every night from 22:00 to 06:00
 bmin_var = 'SOCmin_everymorning' # SOCmin <=> min 40 % hver hver egentlige plugout. SOCmin_everymorning <=> også min 40 % hver morgen.
 
@@ -69,9 +71,11 @@ bmin_var = 'SOCmin_everymorning' # SOCmin <=> min 40 % hver hver egentlige plugo
 vehicle_id = dfv['vehicle_id'].unique()[0]
 z = ((dfv[z_var] == 1)*1).to_numpy()
 u = dfv[u_var].to_numpy()
-uhat = dfv['use_lin'].to_numpy()
+uhat = dfv['use_org_rolling'].to_numpy()
+uhat = np.append(0, uhat) # For first iter, uhat = 0 => uhat[k] = RollingMean(use)_{i = k-(10*24)...k-1}
 b0 = dfv['SOC'][0]
 r = dfv['efficiency_median'].unique()[0]
+#print(np.sum(u), "==", np.sum(dfv['use']))
 # Input
 bmin = dfv[bmin_var].to_numpy()
 # Vehicle parameters
@@ -90,30 +94,30 @@ c_tilde = np.quantile(dfspot['TruePrice'], 0.1) #min(c[-0:24]) # Value of remain
 #################################################### RUN ALL THE MODELS ########################################################
 
 
-
-
 # Note: Scenarios as is right now, do not take into account that the uncertainty/scenarios differences are very dependent of time of day.
 # Sample 5 integers between 0 and 99
 n_scenarios=5
-def StochasticProgram(scenarios, n_scenarios, b0, bmax, bmin, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z, tvec, r, l, verbose=True):
+def StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z, tvec, r, l, KMweights=None, verbose=True):
     """
     Solves the 2-stage stochastic program for a given time horizon T, and returns the optimal solution.
     l: Length of deterministic prices
     O: Number of scenarios (Omega)
     """
-    scenarios = scenarios_all[33:33+n_scenarios, :] # for Dev: Antag n_scenarier scenarier
+    scenarios = scenarios_all[57:57+n_scenarios, :] # for Dev: Antag n_scenarier scenarier
     #scenarios = scenarios_all
+    if KMweights is None:
+        KMweights = np.repeat(1/n_scenarios, n_scenarios)
     O, K = scenarios.shape
     tvec_d = tvec[0:l] # Deterministic part
     tvec_s = tvec[l:]  # Stochastic part
     c_d = c_forecast[:l] # Deterministic part
-    c_s = c_forecast + scenarios # Stochastic part
-    c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negatice electricity spot prices
+    c_s = c_forecast + scenarios[:, :(h+1)] # Stochastic part
+    c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negative electricity spot prices
  
-    # Init problem
+    ### Init problem
     prob = LpProblem("StochEcoMPC", LpMinimize)
 
-    # Init variabless
+    ### Init variables
     x_d = LpVariable.dicts("x_d", tvec_d, lowBound=0, upBound=xmax, cat='Continuous')
     x_s = LpVariable.dicts("x_s", [(t,o) for o in range(O) for t in tvec_s], lowBound=0, upBound=xmax, cat='Continuous') #xs_i,omega
     b = LpVariable.dicts("b", [(t,o) for o in range(O) for t in np.append(tvec,tvec[-1]+1)], lowBound=0, upBound=bmax, cat='Continuous')
@@ -122,11 +126,12 @@ def StochasticProgram(scenarios, n_scenarios, b0, bmax, bmin, xmax, c_forecast, 
     # Set initial SOC to b0 for all scenarios o
     for o in range(O): b[(0,o)] = b0
 
-    # Objective
-    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([1/O * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([1/O * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)] + lpSum([1/O * 100*c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)]))
+    ### Objective
+    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([KMweights[o] * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([KMweights[o] * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)] + lpSum([KMweights[o] * 100*c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)]))
 
-    # Constraints
-    for t in tvec_d: # Deterministic part
+    ### Constraints
+        # Deterministic part
+    for t in tvec_d:
         for o in range(O):
             prob += b[(t+1,o)] == b[(t,o)] + x_d[t]*r - u_forecast[t]
             prob += b[(t+1,o)] >= bmin[t+1] - s2[t+1,o]
@@ -134,7 +139,8 @@ def StochasticProgram(scenarios, n_scenarios, b0, bmax, bmin, xmax, c_forecast, 
             prob += x_d[t] <= xmax * z[t]
             prob += x_d[t] >= 0
 
-    for t in tvec_s: # Stochastic part
+         # Stochastic part$
+    for t in tvec_s:
         for o in range(O):
             prob += b[(t+1,o)] == b[(t,o)] + x_s[(t,o)]*r - u_forecast[t]
             prob += b[(t+1,o)] >= bmin[t+1] - s2[t+1,o]
@@ -159,43 +165,37 @@ def StochasticProgram(scenarios, n_scenarios, b0, bmax, bmin, xmax, c_forecast, 
     # Return results
     return(prob, x_d, b, x_s)
 
-prob, x_d, b, x_s = StochasticProgram(scenarios, 10, b0, bmax, bmin, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z, tvec, r, l=12, verbose=True)
+# prob, x_d, b, x_s = StochasticProgram(scenarios, 10, b0, bmax, bmin, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z, tvec, r, l=12, verbose=True)
 
-# Print results nicely
-print("Status:", LpStatus[prob.status])
-print("Objective:", value(prob.objective))
-for v in prob.variables():
-    print(v.name, "=", v.varValue)
-
-
-# Plot scenarios
-plt.figure()
-for j in range(0, n_scenarios):
-    #plt.plot(c_forecast + scenarios[j,:], label='Scenario '+str(j))
-    plt.plot(c_s[j,:], label='Scenario '+str(j))
-c = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy();
-plt.plot(c, label='True Price', color='black', linewidth=3)
-plt.ylim(-0.5, 7)
-plt.plot(c, label='True Price')
-plt.show()
+# # Print results nicely
+# print("Status:", LpStatus[prob.status])
+# print("Objective:", value(prob.objective))
+# for v in prob.variables():
+#     print(v.name, "=", v.varValue)
 
 
-
+# # Plot scenarios
+# plt.figure()
+# for j in range(0, n_scenarios):
+#     #plt.plot(c_forecast + scenarios[j,:], label='Scenario '+str(j))
+#     plt.plot(c_s[j,:], label='Scenario '+str(j))
+# plt.plot(c_forecast, label='Forecasted Price', color='black', linewidth=3)
+# c = dft.iloc[i, (j+3):(j+3+maxh+1)].to_numpy();
+# plt.plot(c, label='True Price', color='black', linewidth=3)
+# plt.ylim(-0.5, 7)
+# plt.plot(c, label='True Price')
+# plt.show()
 
 
 
 
-
-#### Tasks:
-# Modify function such that bmax can be a series, not just a scalar
-def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, discountfactor=None, maxh=6*24, perfectForesight=False):
+def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False):
     # Study from first hour of prediciton up to and including the latest hour of known spot price
-    maxh=6*24 # Delete
-    h = 6*24 # Delete
-    perfectForesight = True
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
-                        # maxh = maximum h of interest ==> to allow comparison on exact same data for different horizons h.
-    L = 500 # Delete
+    # perfectForesight = False # Deleter
+    # maxh = 6*24 # Delete
+    # h = 4*24 # Delete
+    # #L = 200 # Delete
 
     # Init
     tvec = np.arange(0,h+1)
@@ -215,9 +215,8 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
             if perfectForesight:
                 c_forecast = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy();
 
-            tvec_i = np.arange(k, k+h+1)
-
             # Find relevant input at the specific hours of flexibility
+            tvec_i = np.arange(k, k+h+1)
             z_i = z[tvec_i]
             bmin_i = bmin[np.append(tvec_i, tvec_i[-1]+1)]
 
@@ -226,22 +225,23 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
                 u_forecast = u[tvec_i]
             u_t_true = u[k]
 
-            l = dfp['l_hours_avail'][i] #l = 36 # slet
+            l = max(1, dfp['l_hours_avail'][i]-j) # If (we due to missing forecasts/data) run out of known-hours, only treat from second hour and onwards as stochastic. There is 0 variance on that though, so....
+            
             
             # Solve
-            prob, x_d, b, x_s = StochasticProgram(scenarios, n_scenarios, b0, bmax, bmin, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z, tvec, r, l, verbose=False)
+            prob, x_d, b, x_s = StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, tvec, r, l, KMweights=KMweights, verbose=False)
             if LpStatus[prob.status] != 'Optimal':
-                print("\n\nPlugged in = ", z[k], z_i[0])
-                print("bmin = ", bmin[k], bmin_i[0])
+                print("\n\nPlugged in = ", z[k],"=", z_i[0])
+                print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
                 print("u = ", u[k], u_forecast[0])
-                print("b0 = ", value(b[1,0]))
-                print("x = ", value(x_d[0]), "Trying ", value(x_d[0])+value(b[1,0]), " <= ", bmax)
-                print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j))
+                print("b0 = ", b0, "b1 = ", value(b[1,0]))
+                print("x = ", value(x[0]), "Trying  ", bmin[k+1],"<=", r*value(x[0])+b[1,0]-u[k], " <= ", bmax)
+                print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j), " and l = " + str(l))
                 print("\n\n\n")
 
             # Implement/store only the first step, and re-run in next hour
             x0 = value(x_d[0]); X[k]=x0;                # Amount charged in the now-hour
-            b1 = value(b[1,0]); B[k+1]=b1;              # Battery level after the now-hour / beggining of next hour
+            b1 = value(b[1,0]); B[k+1]=b1;              # Battery level after the now-hsecour / beggining of next hour
             costs += x0 * c[k];     # Cost of charging in the now-hour
             b0 = b1                                   # Next SOC start is the current SOC
             k += 1
@@ -253,9 +253,38 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
 
                 # Tie results intro prob
                 prob = {'x':X, 'b':B, 'u':u[0:L], 'c':c[0:L], 'z':z[0:L], 'objective':total_cost}
-                return(prob, x, b)
+                return(prob, X, B)
 
 ### Run the problem
 h = 4*24 # 5 days horizon for the multi-day smart charge
-prob, x, b = MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24)
+n_scenarios = 5
+prob, x, b = MultiDayStochastic(scenarios_all, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh = 6*24)
 plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+
+
+
+
+# Function to extract the mediods of performing KMediods clustering on the scenarios using sklearn_extra.cluster.KMedoids
+def getMediods(scenarios, n_clusters):
+    # Perform KMedoids clustering
+    kmedoids = KMedoids(n_clusters=n_clusters, random_state=0).fit(scenarios)
+    # Extract mediods
+    mediods = scenarios[kmedoids.medoid_indices_]
+    # Extract proportion of scenarios in each cluster
+    cluster_proportions = np.zeros(n_clusters)
+    for i in range(n_clusters):
+        cluster_proportions[i] = np.mean(kmedoids.labels_ == i)
+    # Return mediods and cluster proportions
+    return(mediods, cluster_proportions)
+
+# Use functions
+n_clusters=5
+mediods, weights = getMediods(scenarios, n_clusters=n_clusters)
+
+
+
+### Run the problem on mediods
+h = 4*24 # 5 days horizon for the multi-day smart charge
+prob, x, b = MultiDayStochastic(mediods, n_clusters, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
+plot_EMPC(prob, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+#### Evt missing: Implement warmstart

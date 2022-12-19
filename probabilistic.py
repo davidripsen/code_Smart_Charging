@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import datetime as dt
-plot=True
+plot=False
 
 # Read the dfp and dft
 dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
@@ -101,11 +101,11 @@ if plot:
 # https://scikit-learn.org/stable/modules/covariance.html
 
 # Drop all columns with nan
-df = dfr.iloc[:,3:maxstep+2].to_numpy()
-mu = dfr.iloc[:,3:maxstep+2].mean(numeric_only=True)
+df = dfr.iloc[:,3:maxstep+3].to_numpy()
+mu = dfr.iloc[:,3:maxstep+3].mean(numeric_only=True)
 #cov = ShrunkCovariance(shrinkage=0.1).fit(df).covariance_
 #cov = np.cov(df, rowvar=False)
-cov = dfr.iloc[:,3:maxstep+2].cov()
+cov = dfr.iloc[:,3:maxstep+3].cov()
     # "the sample covariance matrix was singular which can happen from exactly collinearity (as you've said) or when the number of observations is less than the number of variables."
 
 # Visualise mu (and therefore bias)
@@ -129,7 +129,7 @@ if plot:
 
 
 # Generate 100 samples from the multivariate normal distribution
-samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 100)
+samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 10000)
 print(samples.shape)
 # Export samples to csv
 np.savetxt("./data/MPC-ready/scenarios.csv", samples, delimiter=",")
