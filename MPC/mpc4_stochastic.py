@@ -38,7 +38,7 @@ with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
 
 ####################### Load each element in the list into a dataframe
-dfv = DFV[0]  #dfv1, dfv2, dfv3, dfv4, dfv5, dfv6, dfv7, dfv8, dfv9 = DFV[1], DFV[2], DFV[3], DFV[4], DFV[5], DFV[6], DFV[7], DFV[8], DFV[9]
+dfv = DFV[3]  #dfv1, dfv2, dfv3, dfv4, dfv5, dfv6, dfv7, dfv8, dfv9 = DFV[1], DFV[2], DFV[3], DFV[4], DFV[5], DFV[6], DFV[7], DFV[8], DFV[9]
 dfv              # Is DFV[3] broke?
 
 starttime = max(dfspot['Time'][0], dfp['Atime'][0], dfv.index[0])
@@ -118,17 +118,18 @@ def StochasticProgram(scenarios, n_scenarios, b0, bmax, bmin, xmax, c_forecast, 
     x_s = LpVariable.dicts("x_s", [(t,o) for o in range(O) for t in tvec_s], lowBound=0, upBound=xmax, cat='Continuous') #xs_i,omega
     b = LpVariable.dicts("b", [(t,o) for o in range(O) for t in np.append(tvec,tvec[-1]+1)], lowBound=0, upBound=bmax, cat='Continuous')
     s = LpVariable.dicts("s", [(t,o) for o in range(O) for t in tvec], lowBound=0, upBound=0.25*bmax, cat='Continuous') # Add penalizing slack for violating bmax=80%, but still remain below 100%
+    s2 = {(i, o): LpVariable("s2_("+str(i)+",_"+str(o)+")", lowBound=0, upBound=ub) for o in range(O) for i, ub in enumerate(bmin)}
     # Set initial SOC to b0 for all scenarios o
     for o in range(O): b[(0,o)] = b0
 
     # Objective
-    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([1/O * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([1/O * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)] + lpSum([1/O * 100*c_tilde* s[t,o] for t in tvec for o in range(O)]))
+    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([1/O * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([1/O * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)] + lpSum([1/O * 100*c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)]))
 
     # Constraints
     for t in tvec_d: # Deterministic part
         for o in range(O):
             prob += b[(t+1,o)] == b[(t,o)] + x_d[t]*r - u_forecast[t]
-            prob += b[(t+1,o)] >= bmin[t+1]
+            prob += b[(t+1,o)] >= bmin[t+1] - s2[t+1,o]
             prob += b[(t+1,o)] <= bmax + s[t,o]
             prob += x_d[t] <= xmax * z[t]
             prob += x_d[t] >= 0
@@ -136,7 +137,7 @@ def StochasticProgram(scenarios, n_scenarios, b0, bmax, bmin, xmax, c_forecast, 
     for t in tvec_s: # Stochastic part
         for o in range(O):
             prob += b[(t+1,o)] == b[(t,o)] + x_s[(t,o)]*r - u_forecast[t]
-            prob += b[(t+1,o)] >= bmin[t+1]
+            prob += b[(t+1,o)] >= bmin[t+1] - s2[t+1,o]
             prob += b[(t+1,o)] <= bmax + s[t,o]
             prob += x_s[(t,o)] <= xmax * z[t]
             prob += x_s[(t,o)] >= 0
@@ -194,7 +195,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
     perfectForesight = True
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
                         # maxh = maximum h of interest ==> to allow comparison on exact same data for different horizons h.
-    L = 500
+    L = 500 # Delete
 
     # Init
     tvec = np.arange(0,h+1)

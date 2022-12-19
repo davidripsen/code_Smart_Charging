@@ -21,7 +21,7 @@ use_carnot = True
 # Read the csv files
 #df = pd.read_csv('data/forecastsGreenerEl/prognoser.csv', sep=',', header=0, parse_dates=True)
 dfspot = pd.read_csv('data/spotprice/df_spot_since_sept22_HourDK.csv', sep=',', header=0, parse_dates=True)
-#dfc = pd.read_csv('data/forecastsCarnot/carnot_forecasts.csv', sep=',', header=0, parse_dates=True)
+#dfc = pd.read_csv('data/forecastsCarnot/carnot_forecasts.csv', sep=',', head   er=0, parse_dates=True)
 #dfc = pd.read_csv('data/forecastsCarnot/carnot_forecasts2.csv', sep=',', header=0, parse_dates=True)
 dfc = pd.read_csv('data/forecastsCarnot/carnot_forecasts3.csv', sep=',', header=0, parse_dates=True)
 
@@ -117,7 +117,7 @@ dfspot['TruePrice'] = dfspot['TruePrice']/1000 # Convert to kWh
 dfspot['Time'] = pd.to_datetime(dfspot['Time'], format='%Y-%m-%d %H:%M:%S')
 
 
-###### Insert known prices in Carnot forecasts
+###### Insert known prices in Carnot forecasts (!)
     # Hours ahead where price is known  # Assume available at 13 o' clock CET/CEST
 df['Atime_CET/CEST'] =  df.Atime.dt.tz_localize("UTC").dt.tz_convert("Europe/Copenhagen")
 df['DayAhead_avail'] = df['Atime_CET/CEST'].dt.hour >= 13
@@ -128,7 +128,7 @@ for i, atime in enumerate(df.Atime.unique()):
     # Cut away predictions BEFORE Atime
     dfA = dfA[dfA['Time'] >= dfA['Atime'].dt.floor('H')]
 
-    # Assure that right length
+    # Assure right length
     knownhours = pd.date_range(start=pd.Series(atime).dt.floor('H').min(), end=pd.Series(dfA['Time'].iloc[0]).min(), freq='1H')[:-1]
     knownhoursCOP = knownhours.tz_localize("UTC").tz_convert("Europe/Copenhagen").hour
     zeros = np.where(knownhoursCOP == 0)
@@ -205,7 +205,7 @@ if plot: # Change to run=True for plotting
         plt.xticks(rotation=45)
         plt.tight_layout()
         #plt.show()
-        #fig.savefig('plots/plot_' + str(Atime) + '.pdf')
+        #fig.savefig('plots/Carnot/plot_' + str(Atime) + '.pdf')
         pdf.savefig(fig)
     pdf.close()
 
@@ -224,7 +224,7 @@ if plot:
     fig = px.histogram(df, x='Atime')
     fig.update_layout(title='Prediction horizon (h) for forecast made at different (A)times', xaxis_title='Atime', yaxis_title='Count')
     fig.show()
-    fig.write_image("plots/PredictionHorizonsCarnot="+str(use_carnot)+".png")
+    fig.write_image("plots/Carnot/PredictionHorizonsCarnot="+str(use_carnot)+".png")
 
     # Hor = 101-200 hours (min. 4 day, consider 5 days and fill some steps)
 minH = df['Atime'].value_counts().min()
@@ -301,12 +301,12 @@ dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv')
 # For each Atime plot the Predicted Price (dfp) and TruePrice (dft) throughout the horizon
 K_plots = len(dfp['Atime'].unique()) # 200
 minH = df['Atime'].value_counts().min()
-pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Sliced_Predictions_movie_Carnot="+str(use_carnot)+".pdf")
+pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Carnot/Sliced_Predictions_movie_Carnot="+str(use_carnot)+".pdf")
 if plot: # Change to run=True for plotting
     for i, Atime in enumerate(dfp['Atime'][:K_plots]):
         fig = plt.figure()
-        plt.plot(np.arange(0,minH+1), dfp.iloc[i,2:(2+minH+1)], label='PredictedPrice')
-        plt.plot(np.arange(0,minH+1), dft.iloc[i,2:(2+minH+1)], label='TruePrice', linestyle='--')
+        plt.plot(np.arange(0,minH+1), dfp.iloc[i,3:(3+minH+1)], label='PredictedPrice')
+        plt.plot(np.arange(0,minH+1), dft.iloc[i,3:(3+minH+1)], label='TruePrice', linestyle='--')
         plt.title('PredictedPrice vs TruePrice')
         plt.xlabel('Time [h]     from ' + str(Atime))
         plt.ylabel('Price [DKK/kWh]')
@@ -315,7 +315,7 @@ if plot: # Change to run=True for plotting
         plt.xticks(np.arange(0, minH+1, 1.0))
         plt.axvline(x=Atime, color='r', linestyle='--', label='Atime of forecast')
         plt.tight_layout()
-        plt.legend()
+        plt.legend(loc='upper right')
         #plt.show()
         #fig.savefig('plots/PredMovie2/PredictedPrice_' + str(Atime) + '.pdf')
         pdf.savefig(fig)
