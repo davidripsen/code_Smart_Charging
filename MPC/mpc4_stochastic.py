@@ -12,7 +12,7 @@ import plotly.express as px
 import pandas as pd
 import datetime as dt
 from sklearn_extra.cluster import KMedoids
-from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge
+from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge, ExtractEVdataForMPC
 pd.set_option('display.max_rows', 500)
 runMany = True
 
@@ -23,75 +23,12 @@ scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenari
 with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
 
-# Read the dfp and dft and dfspot
-dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
-dft = pd.read_csv('data/MPC-ready/df_trueprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
-dfspot = pd.read_csv('data/spotprice/df_spot_commontime.csv', sep=',', header=0, parse_dates=True)
-
-dft['Atime'] = pd.to_datetime(dft['Atime'], format='%Y-%m-%d %H:%M:%S')
-dfp['Atime'] = pd.to_datetime(dfp['Atime'], format='%Y-%m-%d %H:%M:%S')
-dfspot['Time'] = pd.to_datetime(dfspot['Time'], format='%Y-%m-%d %H:%M:%S')
-
-# Convert timezone from UTC to Europe/Copenhagen
-dfspot['Time'] = dfspot['Time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
-dfp['Atime'] = dfp['Atime'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
-dft['Atime'] = dft['Atime'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
-
-####################### Load each element in the list into a dataframe ############################
-i = 3
-dfv = DFV[i]  #dfv1, dfv2, dfv3, dfv4, dfv5, dfv6, dfv7, dfv8, dfv9 = DFV[1], DFV[2], DFV[3], DFV[4], DFV[5], DFV[6], DFV[7], DFV[8], DFV[9]
-dfv              # Is DFV[3] broke? Fixed:-).
-
-starttime = max(dfspot['Time'][0], dfp['Atime'][0], dfv.index[0])
-endtime = min(dfspot['Time'].iloc[-1], dfp['Atime'].iloc[-1], dfv.index[-1])
-
-# Cut dfs to be withing starttime and endtime
-dfspot = dfspot[(dfspot['Time'] >= starttime) & (dfspot['Time'] <= endtime)].reset_index(drop=True)
-#dfp = dfp[(dfp['Atime'] >= starttime) & (dfp['Atime'] <= endtime)].reset_index(drop=True) # The forecast history is the bottleneck
-#dft = dft[(dft['Atime'] >= starttime) & (dft['Atime'] <= endtime)].reset_index(drop=True)
-dfv = dfv[(dfv.index >= starttime) & (dfv.index <= endtime)]
-timestamps = dfv.index
-firsthour = dfv.index[0].hour
-dfp = dfp[(dfp['Atime'] >= timestamps[0]) & (dfp['Atime'] <= timestamps[-1])].reset_index(drop=True) # The forecast history is the bottleneck
-dft = dft[(dft['Atime'] >= timestamps[0]) & (dft['Atime'] <= timestamps[-1])].reset_index(drop=True)
-dfv = dfv.reset_index(drop=True)
-
-## Print occurences of number of hours between forecasts
-#dfp.Atime_diff.value_counts() # Up to 66 hours between forecasts
-
-############################################ EXTRACT EV USAGE DATA ####################################################
-# Choice of variables to use
-u_var = 'use_lin' # 'use_lin' or 'use'
-uhat_var = 'use_org_rolling' #
-z_var = 'z_plan_everynight' # 'z_plan': All historical plug-ins (and planned plug-out).  'z_plan_everynight': z_plan + plug-in every night from 22:00 to 06:00
-bmin_var = 'SOCmin_everymorning' # SOCmin <=> min 40 % hver hver egentlige plugout. SOCmin_everymorning <=> også min 40 % hver morgen.
-
-#### Extract EV usage from Monta data #######
 # Use
-vehicle_id = dfv['vehicle_id'].unique()[0]
-z = ((dfv[z_var] == 1)*1).to_numpy()
-u = dfv[u_var].to_numpy()
-uhat = dfv['use_org_rolling'].to_numpy()
-uhat = np.append(0, uhat) # For first iter, uhat = 0 => uhat[k] = RollingMean(use)_{i = k-(10*24)...k-1}
-b0 = dfv['SOC'][0]
-r = dfv['efficiency_median'].unique()[0]
-#print(np.sum(u), "==", np.sum(dfv['use']))
-# Input
-bmin = dfv[bmin_var].to_numpy()
-# Vehicle parameters
-bmax = dfv['SOCmax'].median()
-#bmax = np.nanmin([dfv['SOCmax'], dfv['BatteryCapacity']], axis=0)
-xmax = dfv['CableCapacity'].unique()[0]
-# Price
-c_tilde = np.quantile(dfspot['TruePrice'], 0.1) #min(c[-0:24]) # Value of remaining electricity: lowest el price the past 24h
-
-
+dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[3], z_var='z_plan_everynight', u_var='use_lin',
+                                                                                                                                                 uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
 
 
 #################################################### LET'S GO! ########################################################
-
-
-#################################################### RUN ALL THE MODELS ########################################################
 
 
 # Note: Scenarios as is right now, do not take into account that the uncertainty/scenarios differences are very dependent of time of day.
@@ -127,7 +64,7 @@ def StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin, xmax, c_forecas
     for o in range(O): b[(0,o)] = b0
 
     ### Objective
-    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([KMweights[o] * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([KMweights[o] * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)] + lpSum([KMweights[o] * 100*c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)]))
+    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([KMweights[o] * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([KMweights[o] * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)] + lpSum([KMweights[o] * 1000*c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)]))
 
     ### Constraints
         # Deterministic part
@@ -186,16 +123,34 @@ def StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin, xmax, c_forecas
 # plt.plot(c, label='True Price')
 # plt.show()
 
-
+# Function to extract the mediods of performing KMediods clustering on the scenarios using sklearn_extra.cluster.KMedoids
+def getMediods(scenarios, n_clusters):
+    # Perform KMedoids clustering
+    kmedoids = KMedoids(n_clusters=n_clusters, random_state=0).fit(scenarios)
+    # Extract mediods
+    mediods = scenarios[kmedoids.medoid_indices_]
+    # Extract proportion of scenarios in each cluster
+    cluster_proportions = np.zeros(n_clusters)
+    for i in range(n_clusters):
+        cluster_proportions[i] = np.mean(kmedoids.labels_ == i)
+    # Return mediods and cluster proportions
+    return(mediods, cluster_proportions)
 
 
 def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False):
+    # maxh = 6*24 # Delete
+    # h = 4*24 # Delete
+    # scenarios = mediods # Delete
+    # KMweights = KMweights # Delete
+    # n_scenarios = len(KMweights) # Delete
+    # perfectForesight=False
+
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
     # perfectForesight = False # Deleter
-    # maxh = 6*24 # Delete
-    # h = 4*24 # Delete
-    # #L = 200 # Delete
+
+    #L = 200 # Delete
+
 
     # Init
     tvec = np.arange(0,h+1)
@@ -235,7 +190,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
                 print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
                 print("u = ", u[k], u_forecast[0])
                 print("b0 = ", b0, "b1 = ", value(b[1,0]))
-                print("x = ", value(x[0]), "Trying  ", bmin[k+1],"<=", r*value(x[0])+b[1,0]-u[k], " <= ", bmax)
+                print("x = ", value(x_d[0]), "Trying  ", bmin[k+1],"<=", r*value(x_d[0])+b[1,0]-u[k], " <= ", bmax)
                 print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j), " and l = " + str(l))
                 print("\n\n\n")
 
@@ -262,29 +217,18 @@ prob, x, b = MultiDayStochastic(scenarios_all, n_scenarios, dfp, dfspot, u, uhat
 plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
 
-
-
-# Function to extract the mediods of performing KMediods clustering on the scenarios using sklearn_extra.cluster.KMedoids
-def getMediods(scenarios, n_clusters):
-    # Perform KMedoids clustering
-    kmedoids = KMedoids(n_clusters=n_clusters, random_state=0).fit(scenarios)
-    # Extract mediods
-    mediods = scenarios[kmedoids.medoid_indices_]
-    # Extract proportion of scenarios in each cluster
-    cluster_proportions = np.zeros(n_clusters)
-    for i in range(n_clusters):
-        cluster_proportions[i] = np.mean(kmedoids.labels_ == i)
-    # Return mediods and cluster proportions
-    return(mediods, cluster_proportions)
-
-# Use functions
-n_clusters=5
-mediods, weights = getMediods(scenarios, n_clusters=n_clusters)
-
-
-
-### Run the problem on mediods
+#### Run the problem on mediods
+n_clusters=20
+mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
 h = 4*24 # 5 days horizon for the multi-day smart charge
 prob, x, b = MultiDayStochastic(mediods, n_clusters, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
 plot_EMPC(prob, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 #### Evt missing: Implement warmstart
+
+# Visualise mediods
+fig, ax = plt.subplots(1,1, figsize=(10,5))
+ax.plot(mediods.T)
+ax.set_title('Mediods')
+ax.set_xlabel('Hour')
+ax.set_ylabel('Price')
+plt.show()

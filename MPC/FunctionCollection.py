@@ -5,6 +5,7 @@ from pulp import *
 import numpy as np
 import plotly.graph_objects as go
 import datetime
+import pandas as pd
 
 def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbose=True):
     # Init problem 
@@ -159,18 +160,58 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbose=Fal
 
 
 
+def ExtractEVdataForMPC(dfv, z_var, u_var, uhat_var, bmin_var, p):
+    # Read the dfp and dft and dfspot --- This section can be moved out of the function to save a slgiht bit of time
+    dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
+    dft = pd.read_csv('data/MPC-ready/df_trueprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
+    dfspot = pd.read_csv('data/spotprice/df_spot_commontime.csv', sep=',', header=0, parse_dates=True)
 
+    dft['Atime'] = pd.to_datetime(dft['Atime'], format='%Y-%m-%d %H:%M:%S')
+    dfp['Atime'] = pd.to_datetime(dfp['Atime'], format='%Y-%m-%d %H:%M:%S')
+    dfspot['Time'] = pd.to_datetime(dfspot['Time'], format='%Y-%m-%d %H:%M:%S')
 
+    # Convert timezone from UTC to Europe/Copenhagen
+    dfspot['Time'] = dfspot['Time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
+    dfp['Atime'] = dfp['Atime'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
+    dft['Atime'] = dft['Atime'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
 
+    ####################### Load each element in the list into a dataframe ############################
+    starttime = max(dfspot['Time'][0], dfp['Atime'][0], dfv.index[0])
+    endtime = min(dfspot['Time'].iloc[-1], dfp['Atime'].iloc[-1], dfv.index[-1])
 
+    # Cut dfs to be withing starttime and endtime
+    dfspot = dfspot[(dfspot['Time'] >= starttime) & (dfspot['Time'] <= endtime)].reset_index(drop=True)
+    #dfp = dfp[(dfp['Atime'] >= starttime) & (dfp['Atime'] <= endtime)].reset_index(drop=True) # The forecast history is the bottleneck
+    #dft = dft[(dft['Atime'] >= starttime) & (dft['Atime'] <= endtime)].reset_index(drop=True)
+    dfv = dfv[(dfv.index >= starttime) & (dfv.index <= endtime)]
+    timestamps = dfv.index
+    firsthour = dfv.index[0].hour
+    dfp = dfp[(dfp['Atime'] >= timestamps[0]) & (dfp['Atime'] <= timestamps[-1])].reset_index(drop=True) # The forecast history is the bottleneck
+    dft = dft[(dft['Atime'] >= timestamps[0]) & (dft['Atime'] <= timestamps[-1])].reset_index(drop=True)
+    dfv = dfv.reset_index(drop=True)
 
+    ## Print occurences of number of hours between forecasts
+    #dfp.Atime_diff.value_counts() # Up to 66 hours between forecasts
 
+    ############################################ EXTRACT EV USAGE DATA ####################################################
+    # Use
+    vehicle_id = dfv['vehicle_id'].unique()[0]
+    z = ((dfv[z_var] == 1)*1).to_numpy()
+    u = dfv[u_var].to_numpy()
+    uhat = dfv[uhat_var].to_numpy()
+    uhat = np.append(0, uhat) # For first iter, uhat = 0 => uhat[k] = RollingMean(use)_{i = k-(10*24)...k-1}
+    b0 = dfv['SOC'][0]
+    r = dfv['efficiency_median'].unique()[0]
+    #print(np.sum(u), "==", np.sum(dfv['use']))
+    # Input
+    bmin = dfv[bmin_var].to_numpy()
+    # Vehicle parameters
+    bmax = dfv['SOCmax'].median()
+    #bmax = np.nanmin([dfv['SOCmax'], dfv['BatteryCapacity']], axis=0)
+    xmax = dfv['CableCapacity'].unique()[0]
+    c_tilde = np.quantile(dfspot['TruePrice'], p) #min(c[-0:24]) # Value of remaining electricity: lowest el price the past 24h
 
-
-
-
-
-
+    return dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime
 
 def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plot_efficiency_and_SOCmin=True, vertical_hover=False, df_only=False):
     """

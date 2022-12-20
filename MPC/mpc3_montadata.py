@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import datetime as dt
-from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge, PlotChargingProfile
+from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge, PlotChargingProfile, ExtractEVdataForMPC
 #from code_Smart_Charging.dataviz_cardata2 import PlotChargingProfile
 pd.set_option('display.max_rows', 500)
 runMany = True
@@ -20,73 +20,9 @@ runMany = True
 with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
 
-# Read the dfp and dft and dfspot
-dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
-dft = pd.read_csv('data/MPC-ready/df_trueprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
-dfspot = pd.read_csv('data/spotprice/df_spot_commontime.csv', sep=',', header=0, parse_dates=True)
-
-dft['Atime'] = pd.to_datetime(dft['Atime'], format='%Y-%m-%d %H:%M:%S')
-dfp['Atime'] = pd.to_datetime(dfp['Atime'], format='%Y-%m-%d %H:%M:%S')
-dfspot['Time'] = pd.to_datetime(dfspot['Time'], format='%Y-%m-%d %H:%M:%S')
-
-# Convert timezone from UTC to Europe/Copenhagen
-dfspot['Time'] = dfspot['Time'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
-dfp['Atime'] = dfp['Atime'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
-dft['Atime'] = dft['Atime'].dt.tz_localize('UTC').dt.tz_convert('Europe/Copenhagen')
-
-####################### Load each element in the list into a dataframe ############################
-i = 3
-dfv = DFV[i]  #dfv1, dfv2, dfv3, dfv4, dfv5, dfv6, dfv7, dfv8, dfv9 = DFV[1], DFV[2], DFV[3], DFV[4], DFV[5], DFV[6], DFV[7], DFV[8], DFV[9]
-dfv              # Is DFV[3] broke? Fixed:-).
-
-starttime = max(dfspot['Time'][0], dfp['Atime'][0], dfv.index[0])
-endtime = min(dfspot['Time'].iloc[-1], dfp['Atime'].iloc[-1], dfv.index[-1])
-
-# Cut dfs to be withing starttime and endtime
-dfspot = dfspot[(dfspot['Time'] >= starttime) & (dfspot['Time'] <= endtime)].reset_index(drop=True)
-#dfp = dfp[(dfp['Atime'] >= starttime) & (dfp['Atime'] <= endtime)].reset_index(drop=True) # The forecast history is the bottleneck
-#dft = dft[(dft['Atime'] >= starttime) & (dft['Atime'] <= endtime)].reset_index(drop=True)
-dfv = dfv[(dfv.index >= starttime) & (dfv.index <= endtime)]
-timestamps = dfv.index
-firsthour = dfv.index[0].hour
-dfp = dfp[(dfp['Atime'] >= timestamps[0]) & (dfp['Atime'] <= timestamps[-1])].reset_index(drop=True) # The forecast history is the bottleneck
-dft = dft[(dft['Atime'] >= timestamps[0]) & (dft['Atime'] <= timestamps[-1])].reset_index(drop=True)
-dfv = dfv.reset_index(drop=True)
-
-## Print occurences of number of hours between forecasts
-#dfp.Atime_diff.value_counts() # Up to 66 hours between forecasts
-
-############################################ EXTRACT EV USAGE DATA ####################################################
-# Choice of variables to use
-u_var = 'use_lin' # 'use_lin' or 'use'
-uhat_var = 'use_org_rolling' #
-z_var = 'z_plan_everynight' # 'z_plan': All historical plug-ins (and planned plug-out).  'z_plan_everynight': z_plan + plug-in every night from 22:00 to 06:00
-bmin_var = 'SOCmin_everymorning' # SOCmin <=> min 40 % hver hver egentlige plugout. SOCmin_everymorning <=> også min 40 % hver morgen.
-
-#### Extract EV usage from Monta data #######
 # Use
-vehicle_id = dfv['vehicle_id'].unique()[0]
-z = ((dfv[z_var] == 1)*1).to_numpy()
-u = dfv[u_var].to_numpy()
-uhat = dfv['use_org_rolling'].to_numpy()
-uhat = np.append(0, uhat) # For first iter, uhat = 0 => uhat[k] = RollingMean(use)_{i = k-(10*24)...k-1}
-b0 = dfv['SOC'][0]
-r = dfv['efficiency_median'].unique()[0]
-#print(np.sum(u), "==", np.sum(dfv['use']))
-# Input
-bmin = dfv[bmin_var].to_numpy()
-# Vehicle parameters
-bmax = dfv['SOCmax'].median()
-#bmax = np.nanmin([dfv['SOCmax'], dfv['BatteryCapacity']], axis=0)
-xmax = dfv['CableCapacity'].unique()[0]
-# Price
-c_tilde = np.quantile(dfspot['TruePrice'], 0.1) #min(c[-0:24]) # Value of remaining electricity: lowest el price the past 24h
-
-print("Vehicle ID:", vehicle_id)
-print("Actual starttime =", timestamps[0], "       ", starttime)
-print("Acutal endtime = ", timestamps[-1], "        ", endtime)
-print("length of dfv =", len(dfv))
-print("")
+dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[3], z_var='z_plan_everynight', u_var='use_lin',
+                                                                                                                                                 uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
 
 
 #################################################### LET'S GO! ########################################################
