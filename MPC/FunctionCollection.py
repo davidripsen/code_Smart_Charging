@@ -158,8 +158,79 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbose=Fal
     # Return results
     return(prob, x, b)
 
+# Maintained in mpc3_montadata.py
+def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=False, maxh=6*24, perfectForesight=False):
+    # Study from first hour of prediciton up to and including the latest hour of known spot price
+    L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
+                        # maxh = maximum h of interest ==> to allow comparison on exact same data for different horizons h.
 
+    # Init
+    tvec = np.arange(0,h+1)
+    B = np.empty((L+1)); B[:] = np.nan; B[0] = b0;
+    X = np.empty((L)); X[:] = np.nan
+    c = dfspot['TruePrice'].to_numpy()
+    costs = 0
+    k = 0
 
+    # For each Atime
+    for i in range(len(dfp)):
+        # For each hour until next forecast
+        for j in range(dfp['Atime_diff'][i]):
+            if k%50 == 0:
+                print("k = " + str(k) + " of " + str(L-1))
+            
+            if DayAhead:  # If Day-Ahead Smart Charge, disregard h input and use h = l_hours_avail
+                h = dfp['l_hours_avail'][i]-1-j
+                if h<0: 
+                    h=0# Account for missing forecasts
+                    print("Missing forecasts at k=",k,"i=",i,"j=",j, "... Setting h=0")
+                tvec = np.arange(0,h+1)
+
+            # Extract forecasts from t=0..h
+            c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy()
+            if perfectForesight:
+                c_forecast = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()
+            
+            # Find relevant input at the specific hours of flexibility
+            tvec_i = np.arange(k, k+h+1)
+            z_i = z[tvec_i] # Assuming known plug-in times.
+            bmin_i = bmin[np.append(tvec_i, tvec_i[-1]+1)]
+
+            u_forecast = np.repeat(uhat[k], h+1) # = actually uhat[k-1], but a 0 has been appended as first value.
+            if perfectForesight:
+                u_forecast = u[tvec_i]
+            u_t_true = u[k]
+            
+
+            # Solve
+            prob, x, b = ImperfectForesight(b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, h, tvec, r, verbose=False) # Yes, it is tvec=0..h, NOT tvec_i
+            #print("Status:", LpStatus[prob.status])
+            if LpStatus[prob.status] != 'Optimal':
+                print("\n\nPlugged in = ", z[k],"=", z_i[0])
+                print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
+                print("u = ", u[k], u_forecast[0])
+                print("b0 = ", b0, "b1 = ", value(b[1]))
+                print("x = ", value(x[0]), "Trying  ", bmin[k+1],"<=", r*value(x[0])+b0-u[k], " <= ", bmax)
+                print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j))
+                print("\n\n\n")
+            
+            # Implement/store only the first step, and re-run in next hour
+            x0 = value(x[0]); X[k]=x0;                # Amount charged in the now-hour
+            b1 = value(b[1]); B[k+1]=b1;              # Battery level after the now-hour / beggining of next hour
+            costs += x0 * c[k];                       # Cost of charging in the now-hour
+            b0 = b1                                   # Next SOC start is the current SOC
+            k += 1
+
+            # THE END
+            if k == L:
+                # Costs
+                total_cost = np.sum(costs) - c_tilde * (B[-1] - B[0])
+
+                # Tie results intro prob
+                prob = {'x':X, 'b':B, 'u':u[0:L], 'c':c[0:L], 'z':z[0:L], 'objective':total_cost}
+                return(prob, X, B)
+
+# Maitained here
 def ExtractEVdataForMPC(dfv, z_var, u_var, uhat_var, bmin_var, p):
     # Read the dfp and dft and dfspot --- This section can be moved out of the function to save a slgiht bit of time
     dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
@@ -213,6 +284,7 @@ def ExtractEVdataForMPC(dfv, z_var, u_var, uhat_var, bmin_var, p):
 
     return dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime
 
+# Maintained in dataviz_cardata2.py
 def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plot_efficiency_and_SOCmin=True, vertical_hover=False, df_only=False):
     """
     Plot the charging profile of a single vehicle

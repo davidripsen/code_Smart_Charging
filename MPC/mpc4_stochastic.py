@@ -12,9 +12,10 @@ import plotly.express as px
 import pandas as pd
 import datetime as dt
 from sklearn_extra.cluster import KMedoids
-from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge, ExtractEVdataForMPC
+from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge, ExtractEVdataForMPC, MultiDay
 pd.set_option('display.max_rows', 500)
 runMany = True
+runDeterministicReference = True
 
 # Read scenarios from txt
 scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenarios_all=scenarios;
@@ -32,15 +33,13 @@ dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde,
 
 
 # Note: Scenarios as is right now, do not take into account that the uncertainty/scenarios differences are very dependent of time of day.
-# Sample 5 integers between 0 and 99
-n_scenarios=5
 def StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z, tvec, r, l, KMweights=None, verbose=True):
     """
     Solves the 2-stage stochastic program for a given time horizon T, and returns the optimal solution.
     l: Length of deterministic prices
     O: Number of scenarios (Omega)
     """
-    scenarios = scenarios_all[57:57+n_scenarios, :] # for Dev: Antag n_scenarier scenarier
+    scenarios = scenarios[0:n_scenarios, :] # for Dev: Antag n_scenarier scenarier
     #scenarios = scenarios_all
     if KMweights is None:
         KMweights = np.repeat(1/n_scenarios, n_scenarios)
@@ -64,7 +63,7 @@ def StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin, xmax, c_forecas
     for o in range(O): b[(0,o)] = b0
 
     ### Objective
-    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([KMweights[o] * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([KMweights[o] * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)] + lpSum([KMweights[o] * 1000*c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)]))
+    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([KMweights[o] * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([KMweights[o] * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)]) + lpSum([KMweights[o] * 100*O*c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)])
 
     ### Constraints
         # Deterministic part
@@ -212,10 +211,9 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
 
 ### Run the problem
 h = 4*24 # 5 days horizon for the multi-day smart charge
-n_scenarios = 5
+n_scenarios = 20
 prob, x, b = MultiDayStochastic(scenarios_all, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh = 6*24)
 plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
-
 
 #### Run the problem on mediods
 n_clusters=20
@@ -225,10 +223,52 @@ prob, x, b = MultiDayStochastic(mediods, n_clusters, dfp, dfspot, u, uhat, z, h,
 plot_EMPC(prob, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 #### Evt missing: Implement warmstart
 
-# Visualise mediods
-fig, ax = plt.subplots(1,1, figsize=(10,5))
-ax.plot(mediods.T)
-ax.set_title('Mediods')
-ax.set_xlabel('Hour')
-ax.set_ylabel('Price')
-plt.show()
+if runDeterministicReference:
+    ### Multi-Dayahead (Deterministic)
+    h = 4*24 # 5 days horizon for the multi-day smart charge
+    prob, x, b = MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=False)
+    #prob, x, b = MultiDay(dft, dfspot, u, uhat, z, 6*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24) # Snyd: kendte priser
+    plot_EMPC(prob, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+
+    # Compare models on the data within horizon
+    maxh = 6*24
+    L = len(u) - (maxh+1)
+    T = L - 1
+    tvec = np.arange(T+1)
+    T_within = T #-maxh 
+    c_within = dfspot['TruePrice'][0:T_within+1] # Actually uses all prices in this case:-)
+    tvec_within = tvec[0:T_within+1]
+    z_within = z[0:T_within+1]
+    u_within = u[0:T_within+1]
+    u2_within = dfv['use'].to_numpy()[0:T_within+1]
+    bmin_within = bmin[0:T_within+2]
+
+    ### Day-Ahead SmartCharge
+    prob, x, b = MultiDay(dfp, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=True, maxh=6*24, perfectForesight=False)
+    plot_EMPC(prob, 'Day-Ahead Smart Charge of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour)
+
+
+    ### Perfect Foresight
+    prob, x, b = PerfectForesight(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r, verbose=True)
+    plot_EMPC(prob, 'Perfect Foresight   of vehicle = ' + str(vehicle_id), x, b, u_within, c_within, z_within,  starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+        # Verify the objective value
+    print("Objective value = ", prob.objective.value())
+    print("Objective value = ", np.sum([value(x[t]) * c_within[t] for t in tvec_within]) - c_tilde * (value(b[T+1]) - b[0]))
+
+    ### DumbCharge
+    prob, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r, verbose=False)
+    plot_EMPC(prob, 'Dumb Charge   of vehicle = ' + str(vehicle_id) + '   r = '+str(r), x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+    
+
+# Conclusion. One would expect that the total costs for the models are  Perfect Foresight < Stochastic + kMediods  < Stochastic <   MultiDay  <  Day-Ahead Smart Charge      (EXPECTED)
+# However, it is (with h=4 days)                                        Perfect Foresight < Day-Ahead < Stochastic < Stochastic + kMediods    < MutliDay                     (ACTUAL  )
+# <=> VERY DIFFERENT :((
+
+
+# # Visualise mediods
+# fig, ax = plt.subplots(1,1, figsize=(10,5))
+# ax.plot(mediods.T)
+# ax.set_title('Mediods')
+# ax.set_xlabel('Hour')
+# ax.set_ylabel('Price')
+# plt.show()
