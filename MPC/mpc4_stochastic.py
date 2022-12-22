@@ -24,8 +24,9 @@ scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenari
 with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
 
-# Use
-dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[3], z_var='z_plan_everynight', u_var='use_lin',
+# Extract info
+i = 2 # i=2 Good performance (from stochastic model), i=3: Shitty performance
+dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
                                                                                                                                                  uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
 
 
@@ -211,12 +212,12 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
 
 ### Run the problem
 h = 4*24 # 5 days horizon for the multi-day smart charge
-n_scenarios = 20
+n_scenarios = 10
 prob, x, b = MultiDayStochastic(scenarios_all, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh = 6*24)
 plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
 #### Run the problem on mediods
-n_clusters=20
+n_clusters=10
 mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
 h = 4*24 # 5 days horizon for the multi-day smart charge
 prob, x, b = MultiDayStochastic(mediods, n_clusters, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
@@ -261,7 +262,7 @@ if runDeterministicReference:
     
 
 # Conclusion. One would expect that the total costs for the models are  Perfect Foresight < Stochastic + kMediods  < Stochastic <   MultiDay  <  Day-Ahead Smart Charge      (EXPECTED)
-# However, it is (with h=4 days)                                        Perfect Foresight < Day-Ahead < Stochastic < Stochastic + kMediods    < MutliDay                     (ACTUAL  )
+# However, it is (with h=4 days) # for DFV[3]                           Perfect Foresight < Day-Ahead < Stochastic < Stochastic + kMediods    < MutliDay                     (ACTUAL  )
 # <=> VERY DIFFERENT :((
 
 

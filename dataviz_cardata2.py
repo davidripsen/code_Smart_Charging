@@ -467,7 +467,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         fig.show()
     return df
     
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=30380, plot_efficiency_and_SOCmin=True, vertical_hover=False)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=6093, plot_efficiency_and_SOCmin=True, vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[89], vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, vertical_hover=False)
 
@@ -481,14 +481,14 @@ for id in ids:
 DFV = []
 indx = D2['capacity_kwh'] >= 40
 vehicles_sorted = D2['VEHICLE_ID'][indx].value_counts().index
-bad_ids = [] # No bad ids :-)
-N = 10 + len(bad_ids)
+bad_ids = [6366] # No bad ids :-)
+N = 100 + len(bad_ids)
 for id in vehicles_sorted[:N]:
     if id in bad_ids:
         print("    [Skipping vehicle", id, "]")
         continue
     print("Plotting vehicle", id)
-    dfv = PlotChargingProfile(D2, id=id, df_only=True, plot_efficiency_and_SOCmin=False, vertical_hover=False)
+    dfv = PlotChargingProfile(D2, id=id, df_only=False, plot_efficiency_and_SOCmin=False, vertical_hover=False)
     DFV.append(dfv)
 
 # Export list of vehicles
