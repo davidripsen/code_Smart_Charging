@@ -36,6 +36,7 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAh
                         # maxh = maximum h of interest ==> to allow comparison on exact same data for different horizons h.
 
     # Init
+    flag_AllFeasible = True
     tvec = np.arange(0,h+1)
     B = np.empty((L+1)); B[:] = np.nan; B[0] = b0;
     X = np.empty((L)); X[:] = np.nan
@@ -77,6 +78,7 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAh
             prob, x, b = ImperfectForesight(b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, h, tvec, r, verbose=False) # Yes, it is tvec=0..h, NOT tvec_i
             #print("Status:", LpStatus[prob.status])
             if LpStatus[prob.status] != 'Optimal':
+                flag_AllFeasible = False
                 print("\n\nPlugged in = ", z[k],"=", z_i[0])
                 print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
                 print("u = ", u[k], u_forecast[0])
@@ -99,7 +101,7 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAh
 
                 # Tie results intro prob
                 prob = {'x':X, 'b':B, 'u':u[0:L], 'c':c[0:L], 'z':z[0:L], 'objective':total_cost}
-                return(prob, X, B)
+                return(prob, X, B, flag_AllFeasible)
 
 ### Run the problem
 if not runMany:

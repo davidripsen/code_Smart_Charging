@@ -165,6 +165,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
 
 
     # Init
+    flag_AllFeasible = True
     prev_sol = None
     tvec = np.arange(0,h+1)
     B = np.empty((L+1)); B[:] = np.nan; B[0] = b0;
@@ -199,6 +200,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
             # Solve
             prob, x_d, b, x_s = StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, tvec, r, l, previous_solution=None, KMweights=KMweights, verbose=verbose)
             if LpStatus[prob.status] != 'Optimal':
+                flag_AllFeasible = False
                 print("\n\nPlugged in = ", z[k],"=", z_i[0])
                 print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
                 print("u_true, u_forecast = ", u[k], u_forecast[0])
@@ -222,7 +224,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
 
                 # Tie results intro prob
                 prob = {'x':X, 'b':B, 'u':u[0:L], 'c':c[0:L], 'z':z[0:L], 'objective':total_cost}
-                return(prob, X, B)
+                return(prob, X, B, flag_AllFeasible)
 
 ### Run the problem
 h = 4*24 # 5 days horizon for the multi-day smart charge
