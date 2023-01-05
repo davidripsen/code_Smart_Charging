@@ -14,8 +14,8 @@ import matplotlib.backends.backend_pdf
 import seaborn as sns
 sns.set_theme()
 pd.set_option('display.max_rows', 500)
-plot = False
-plot_alot = False
+plot = True
+plot_alot = True
 use_carnot = True
 
 # Read the csv files

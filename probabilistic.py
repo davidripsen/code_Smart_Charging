@@ -129,7 +129,7 @@ if plot:
 
 
 # Generate 100 samples from the multivariate normal distribution
-samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 10000)
+samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 20000)
 print(samples.shape)
 # Export samples to csv
 np.savetxt("./data/MPC-ready/scenarios.csv", samples, delimiter=",")

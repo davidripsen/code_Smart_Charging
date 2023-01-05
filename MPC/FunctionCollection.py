@@ -251,7 +251,7 @@ def getMediods(scenarios, n_clusters):
     # Return mediods and cluster proportions
     return(mediods, cluster_proportions)
 
-def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, verbose=False):
+def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, verbose=False):
 
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
@@ -276,10 +276,19 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
         # For each hour until next forecast
         for j in range(dfp['Atime_diff'][i]):
             if k%50 == 1: print("k = " + str(k) + " of " + str(L-1))
+
+            # Patch holes in forecasts (1 out of 2)
+            l = dfp['l_hours_avail'][i]-j
+            if l < 12: # New prices are known at 13.00
+                l = 35
+
             # Extract forecasts from t=0..h
             c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy();
             if perfectForesight:
                 c_forecast = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy();
+            
+            # Patch holes in forecasts (2 out of 2) - use known prices
+            c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()[:min(l,h+1)]
 
             # Find relevant input at the specific hours of flexibility
             tvec_i = np.arange(k, k+h+1)
@@ -291,8 +300,6 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
                 u_forecast = u[tvec_i]
             u_t_true = u[k]
 
-            l = max(1, dfp['l_hours_avail'][i]-j) # If (we due to missing forecasts/data) run out of known-hours, only treat from second hour and onwards as stochastic. There is 0 variance on that though, so....
-            
             # Solve
             prob, x_d, b, x_s = StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, tvec, r, l, previous_solution=None, KMweights=KMweights, verbose=verbose)
             if LpStatus[prob.status] != 'Optimal':
@@ -323,7 +330,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
                 return(prob, X, B, flag_AllFeasible)
 
 # Maintained in here (from mpc3_montadata.py)
-def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=False, maxh=6*24, perfectForesight=False):
+def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=False, maxh=6*24, perfectForesight=False):
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
                         # maxh = maximum h of interest ==> to allow comparison on exact same data for different horizons h.
@@ -346,14 +353,11 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAh
             
             # Patch holes in forecasts (1 out of 2)
             l = dfp['l_hours_avail'][i]-j
-            if l < 12: # New prices are definitely known at 14:00
-                l = 36
+            if l < 12: # New prices are known at 13.00
+                l = 35
 
-            if DayAhead:  # If Day-Ahead Smart Charge, disregard h input and use h = l_hours_avail
+            if DayAhead:  # If Day-Ahead Smart Charge, disregard h input and use h = l_hours_avail-1
                 h = l-1
-                if h<0: 
-                    h=0# Account for missing forecasts
-                    print("Missing forecasts at k=",k,"i=",i,"j=",j, "... Setting h=0")
                 tvec = np.arange(0,h+1)
 
             # Extract forecasts from t=0..h
@@ -362,7 +366,7 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAh
                 c_forecast = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()
             
             # Patch holes in forecasts (2 out of 2) - use known prices
-            c_forecast[:l] = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()[:l]
+            c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()[:min(l,h+1)]
 
             # Find relevant input at the specific hours of flexibility
             tvec_i = np.arange(k, k+h+1)
