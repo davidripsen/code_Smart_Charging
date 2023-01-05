@@ -123,36 +123,45 @@ df['Atime_CET/CEST'] =  df.Atime.dt.tz_localize("UTC").dt.tz_convert("Europe/Cop
 df['DayAhead_avail'] = df['Atime_CET/CEST'].dt.hour >= 13
 cnt = 0
 for i, atime in enumerate(df.Atime.unique()):
-    print(i)
+    # atime = df.Atime.unique()[i]
     dfA = df[df['Atime'] == atime]
     # Cut away predictions BEFORE Atime
     dfA = dfA[dfA['Time'] >= dfA['Atime'].dt.floor('H')]
 
     # Assure right length
-    knownhours = pd.date_range(start=pd.Series(atime).dt.floor('H').min(), end=pd.Series(dfA['Time'].iloc[0]).min(), freq='1H')[:-1]
-    knownhoursCOP = knownhours.tz_localize("UTC").tz_convert("Europe/Copenhagen").hour
-    zeros = np.where(knownhoursCOP == 0)
-    if sum(knownhoursCOP == 0) >= 2:
-        knownhours = knownhours[:zeros[-1][-1]] # If there are two 0's, cut away after the last one.
-        knownhoursCOP = knownhoursCOP[:zeros[-1][-1]]
-        cnt=cnt+1
-        print('Hours cut off because of two 0s at ', i, '  <=> forecasts are missing  ', atime)
+    #knownhours = pd.date_range(start=pd.Series(atime).dt.floor('H').min(), end=pd.Series(dfA['Time'].iloc[0]).min(), freq='1H')[:-1]
+    atimeCOP = dfA['Atime_CET/CEST'].min()
+    knownhoursCOP = pd.date_range(start = pd.Series(atimeCOP).dt.floor('H',ambiguous=False).min(),
+                                  end = pd.Series(atimeCOP).dt.ceil('D',ambiguous=False).min() + (pd.Timedelta(hours=24) * int(dfA['DayAhead_avail'].unique()[0])),
+                                  freq = '1H',
+                                  tz = "Europe/Copenhagen",
+                                  ambiguous="infer")[:-1]
 
-    zeros = np.where(knownhoursCOP == 0)
+    knownhoursCOPhours = knownhoursCOP.hour
+    zeros = np.where(knownhoursCOPhours == 0)
+    if sum(knownhoursCOPhours == 0) >= 2:
+        knownhoursCOP = knownhoursCOP[:zeros[-1][-1]] # If there are two 0's, cut away after the last one.
+        knownhoursCOPhours = knownhoursCOPhours[:zeros[-1][-1]]
+        cnt=cnt+1
+        print('Hours cut off because of two 0s at ', i, atime)
+
+    zeros = np.where(knownhoursCOPhours == 0)
 
     # Check if two consecutive numbers are the same in knownhoursCOP
-    timezone_change = 1 if sum(knownhoursCOP[1:] == knownhoursCOP[:-1]) >= 1 else 0
+    timezone_change = 1 if sum(knownhoursCOPhours[1:] == knownhoursCOPhours[:-1]) >= 1 else 0
+    if timezone_change:
+        print('Timezone change at ', i, atime)
 
-    if not dfA.DayAhead_avail.iloc[-1] and len(knownhours) > 0:
-        if len(knownhoursCOP) > 24 - knownhoursCOP[0] + timezone_change:
-            knownhours = knownhours[:zeros[-1][-1]] # If Days-Ahead is not AND there is more hours than up to 23.00, then cut away at the last 0.
+    if not dfA.DayAhead_avail.iloc[-1] and len(knownhoursCOP) > 0:
+        if len(knownhoursCOPhours) > 24 - knownhoursCOPhours[0] + timezone_change:
+            knownhoursCOP = knownhoursCOP[:zeros[-1][-1]] # If Days-Ahead is not AND there is more hours than up to 23.00, then cut away at the last 0.
             cnt=cnt+1
             print('Gap between Atime and First time is too long <=>  forecasts are missing ', i,' ', atime)
 
-    assert len(knownhours) <= 24 + timezone_change + 24*dfA.DayAhead_avail.iloc[-1], "More than 24 hours of known prices, but not DayAhead_avail"
+    assert len(knownhoursCOP) <= 24 + timezone_change + 24*dfA.DayAhead_avail.iloc[-1], "More than 24 hours of known prices, but not DayAhead_avail"
     # Concat knownhours to dfA
-    dfA = pd.concat([pd.DataFrame({'Atime': atime, 'Atime_org': np.nan, 'Time': knownhours, 'PredPrice': np.nan, 'TruePrice_Carnot': np.nan, 'Source': 'nordpool_insert'}), dfA])
-    dfA['l_hours_avail'] = len(knownhours)
+    dfA = pd.concat([pd.DataFrame({'Atime': atime, 'Atime_org': np.nan, 'Time': knownhoursCOP, 'PredPrice': np.nan, 'TruePrice_Carnot': np.nan, 'Source': 'nordpool_insert'}), dfA])
+    dfA['l_hours_avail'] = len(knownhoursCOP)
 
     # Insert dfA in df
     df = df.drop(df[df['Atime'] == atime].index)

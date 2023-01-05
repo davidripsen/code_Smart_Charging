@@ -346,8 +346,8 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAh
             
             # Patch holes in forecasts (1 out of 2)
             l = dfp['l_hours_avail'][i]-j
-            if l < 10: # New prices are definitely known at 14:00
-                l = 34
+            if l < 11: # New prices are definitely known at 14:00
+                l = 35
 
             if DayAhead:  # If Day-Ahead Smart Charge, disregard h input and use h = l_hours_avail
                 h = l-1

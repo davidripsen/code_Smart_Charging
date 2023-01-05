@@ -25,7 +25,7 @@ with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
 
 
-i = 9 # i=2 Good performance (from stochastic model), i=3: Shitty performance
+i = 0 # i=2 Good performance (from stochastic model), i=3: Shitty performance
 dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
                                                                                                                                                 uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
 
