@@ -231,10 +231,10 @@ def StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin, xmax, c_forecas
 
     #Update b1 with actual use (relative to what we chose to charge) (Should be sufficient only to update b(1,0))
     for o in range(O):
-        b[(1,o)] = b[(0,o)] + value(x_d[0]) - u_t_true
+        b[(1,o)] = b[(0,o)] + value(x_d[0])*r - u_t_true
         prob.assignVarsVals({'b_(1,_'+str(o)+')': b[1,o]})
         assert b[1,o] == value(b[1,0]), "b(1,o) is not equal to value(b(1,0))"
-        # ^ Most of this code is redundant
+        # ^ Most of this loop code is redundant
 
     # Return results
     return(prob, x_d, b, x_s)
@@ -322,7 +322,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dfspot, u, uhat, z, h, b0, b
                 prob = {'x':X, 'b':B, 'u':u[0:L], 'c':c[0:L], 'z':z[0:L], 'objective':total_cost}
                 return(prob, X, B, flag_AllFeasible)
 
-# Maintained in mpc3_montadata.py
+# Maintained in here (from mpc3_montadata.py)
 def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=False, maxh=6*24, perfectForesight=False):
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
@@ -344,8 +344,13 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAh
             if k%50 == 0:
                 print("k = " + str(k) + " of " + str(L-1))
             
+            # Patch holes in forecasts (1 out of 2)
+            l = dfp['l_hours_avail'][i]-j
+            if l < 10: # New prices are definitely known at 14:00
+                l = 34
+
             if DayAhead:  # If Day-Ahead Smart Charge, disregard h input and use h = l_hours_avail
-                h = dfp['l_hours_avail'][i]-1-j
+                h = l-1
                 if h<0: 
                     h=0# Account for missing forecasts
                     print("Missing forecasts at k=",k,"i=",i,"j=",j, "... Setting h=0")
@@ -356,6 +361,9 @@ def MultiDay(dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAh
             if perfectForesight:
                 c_forecast = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()
             
+            # Patch holes in forecasts (2 out of 2) - use known prices
+            c_forecast[:l] = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()[:l]
+
             # Find relevant input at the specific hours of flexibility
             tvec_i = np.arange(k, k+h+1)
             z_i = z[tvec_i] # Assuming known plug-in times.

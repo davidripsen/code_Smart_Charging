@@ -25,7 +25,7 @@ with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
 
 
-i = 0 # i=2 Good performance (from stochastic model), i=3: Shitty performance
+i = 9 # i=2 Good performance (from stochastic model), i=3: Shitty performance
 dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
                                                                                                                                                 uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
 
@@ -106,7 +106,7 @@ def StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin, xmax, c_forecas
 
     #Update b1 with actual use (relative to what we chose to charge) (Should be sufficient only to update b(1,0))
     for o in range(O):
-        b[(1,o)] = b[(0,o)] + value(x_d[0]) - u_t_true
+        b[(1,o)] = b[(0,o)] + value(x_d[0])*r - u_t_true
         prob.assignVarsVals({'b_(1,_'+str(o)+')': b[1,o]})
         assert b[1,o] == value(b[1,0]), "b(1,o) is not equal to value(b(1,0))"
         # ^ Most of this code is redundant
@@ -236,7 +236,7 @@ n_scenarios = 10
 n_clusters=10
 mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
 h = 4*24 # 5 days horizon for the multi-day smart charge
-prob_stochKM, x, b = MultiDayStochastic(mediods, n_clusters, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
+prob_stochKM, x, b, flag_AllFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
 plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 #### Evt missing: Implement warmstart
 
@@ -261,7 +261,7 @@ if runDeterministicReference:
     bmin_within = bmin[0:T_within+2]
 
     ### Day-Ahead SmartCharge
-    prob_da, x, b = MultiDay(dfp, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=True, maxh=6*24, perfectForesight=False)
+    prob_da, x, b, flag_AllFeasible_da = MultiDay(dfp, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=True, maxh=6*24, perfectForesight=False)
     plot_EMPC(prob_da, 'Day-Ahead Smart Charge of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour)
 
 
@@ -300,3 +300,5 @@ if runDeterministicReference:
 # fig.add_trace(go.Scatter(x=np.arange(len(costs_da)), y=costs_da, name='Day-Ahead'))
 # fig.update_layout(title='Cumulative costs for different models    of vehicle = '+str(vehicle_id), xaxis_title='Time', yaxis_title='Costs')
 # fig.show()
+
+## 

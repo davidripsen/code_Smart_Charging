@@ -113,8 +113,8 @@ for i in range(len(DFV)):
             absolutePerformances[model][i] = round(AbsolutePerformance(results["obj_"+model][i], results['obj_dc'][i]),2)
         relativePerformances['pf'][i] = -1*relativePerformances['pf'][i]
         
-        # Export results to file
-        results.to_csv('results/'+nowstring+'/results.csv', index=False)
-        infeasibles.to_csv('results/'+nowstring+'/infeasibles.csv', index=False)
-        relativePerformances.to_csv('results/'+nowstring+'/relativePerformances.csv', index=False)
-        absolutePerformances.to_csv('results/'+nowstring+'/absolutePerformances.csv', index=False)
+    # Export results to file
+    results.to_csv('results/'+nowstring+'/results.csv', index=False)
+    infeasibles.to_csv('results/'+nowstring+'/infeasibles.csv', index=False)
+    relativePerformances.to_csv('results/'+nowstring+'/relativePerformances.csv', index=False)
+    absolutePerformances.to_csv('results/'+nowstring+'/absolutePerformances.csv', index=False)
