@@ -160,7 +160,8 @@ for i, atime in enumerate(df.Atime.unique()):
 
     assert len(knownhoursCOP) <= 24 + timezone_change + 24*dfA.DayAhead_avail.iloc[-1], "More than 24 hours of known prices, but not DayAhead_avail"
     # Concat knownhours to dfA
-    dfA = pd.concat([pd.DataFrame({'Atime': atime, 'Atime_org': np.nan, 'Time': knownhoursCOP, 'PredPrice': np.nan, 'TruePrice_Carnot': np.nan, 'Source': 'nordpool_insert'}), dfA])
+    knownhours = pd.Series(knownhoursCOP).dt.tz_convert("UTC").dt.tz_localize(None)
+    dfA = pd.concat([pd.DataFrame({'Atime': atime, 'Atime_org': np.nan, 'Time': knownhours, 'PredPrice': np.nan, 'TruePrice_Carnot': np.nan, 'Source': 'nordpool_insert'}), dfA])
     dfA['l_hours_avail'] = len(knownhoursCOP)
 
     # Insert dfA in df
