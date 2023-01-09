@@ -24,12 +24,14 @@ scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenari
 with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
 
-
-for i in range(6):
+# Ids of interest
+idsOfInterest = [1601, 30299, 6817, 18908] # Ids where perfect foresight fails
+for i in range(len(DFV)):
     # i=2 Good performance (from stochastic model), i=3: Shitty performance
     dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
                                                                                                                                                     uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
-
+    if vehicle_id not in idsOfInterest:
+        continue
 
     #################################################### LET'S GO! ########################################################
 
@@ -241,19 +243,19 @@ for i in range(6):
     #plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
     #### Run the problem on mediods
-    n_clusters=10
-    mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
-    h = 4*24 # 5 days horizon for the multi-day smart charge
-    prob_stochKM, x, b, flag_AllFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
-    plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
-    #### Evt missing: Implement warmstart
+    # n_clusters=10
+    # mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
+    # h = 4*24 # 5 days horizon for the multi-day smart charge
+    # prob_stochKM, x, b, flag_AllFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
+    # plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+    # #### Evt missing: Implement warmstart
 
     if runDeterministicReference:
         ### Multi-Dayahead (Deterministic)
         h = 4*24 # 5 days horizon for the multi-day smart charge
-        prob_mda, x, b, flagFeasible_mda = MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=False)
-        #prob, x, b = MultiDay(dft, dfspot, u, uhat, z, 6*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24) # Snyd: kendte priser
-        plot_EMPC(prob_mda, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+        # prob_mda, x, b, flagFeasible_mda = MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=False)
+        # #prob, x, b = MultiDay(dft, dfspot, u, uhat, z, 6*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24) # Snyd: kendte priser
+        # plot_EMPC(prob_mda, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
         # Compare models on the data within horizon
         maxh = 6*24
@@ -268,21 +270,22 @@ for i in range(6):
         u2_within = dfv['use'].to_numpy()[0:T_within+1]
         bmin_within = bmin[0:T_within+2]
 
-        ### Day-Ahead SmartCharge
-        prob_da, x, b, flag_AllFeasible_da = MultiDay(dfp, dft, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=True, maxh=6*24, perfectForesight=False)
-        plot_EMPC(prob_da, 'Day-Ahead Smart Charge of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour)
+        # ## Day-Ahead SmartCharge
+        # prob_da, x, b, flag_AllFeasible_da = MultiDay(dfp, dft, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=True, maxh=6*24, perfectForesight=False)
+        # plot_EMPC(prob_da, 'Day-Ahead Smart Charge of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour)
 
 
         ### Perfect Foresight
-        prob, x, b = PerfectForesight(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r, verbose=True)
+        prob, x, b = PerfectForesight(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r, verbose=False)
+        flagFeasible_pf = LpStatus[prob.status] == 'Optimal'; print('Perfect Foresight: ', flagFeasible_pf, '  Vehile_id=', vehicle_id)
         plot_EMPC(prob, 'Perfect Foresight   of vehicle = ' + str(vehicle_id), x, b, u_within, c_within, z_within,  starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
             # Verify the objective value
         print("Objective value = ", prob.objective.value())
         print("Objective value = ", np.sum([value(x[t]) * c_within[t] for t in tvec_within]) - c_tilde * (value(b[T+1]) - b[0]))
 
-        ### DumbCharge
-        prob_dc, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r, verbose=False)
-        plot_EMPC(prob_dc, 'Dumb Charge   of vehicle = ' + str(vehicle_id) + '   r = '+str(r), x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+        # ### DumbCharge
+        # prob_dc, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r, verbose=False)
+        # plot_EMPC(prob_dc, 'Dumb Charge   of vehicle = ' + str(vehicle_id) + '   r = '+str(r), x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
         
 
     # Conclusion. One would expect that the total costs for the models are  Perfect Foresight < Stochastic + kMediods  < Stochastic <   MultiDay  <  Day-Ahead Smart Charge      (EXPECTED)

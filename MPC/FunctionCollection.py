@@ -15,16 +15,18 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbo
     # Init variabless
     x = LpVariable.dicts("x", tvec, lowBound=0, upBound=xmax, cat='Continuous')
     b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=bmax, cat='Continuous')
+    s = LpVariable.dicts("s", tvec, lowBound=0, upBound=0.20*1.25*bmax, cat='Continuous')
+    s2 = {i: LpVariable("s2_"+str(i), lowBound=0, upBound=ub, cat='Continuous') for i, ub in enumerate(bmin)}
     b[0] = b0
 
     # Objective
-    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * ((b[T+1])-b[0]))
+    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * (b[T+1]-b[0]) + [100*c_tilde*(s[t]+s2[t+1]) for t in tvec])
 
     # Constraints
     for t in tvec:
         prob += b[t+1] == b[t] + x[t]*r - u[t]
-        prob += b[t+1] >= bmin[t+1]
-        prob += b[t+1] <= bmax
+        prob += b[t+1] >= bmin[t+1] - s2[t+1]
+        prob += b[t+1] <= bmax + s[t]
         prob += x[t] <= xmax * z[t]
         prob += x[t] >= 0
 
@@ -33,6 +35,9 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbo
         prob.solve(PULP_CBC_CMD(msg=1))
     else:
         prob.solve(PULP_CBC_CMD(msg=0))
+
+    # Return objective without penalization
+    prob += lpSum([c[t]*x[t] for t in tvec] - c_tilde * (b[T+1]-b[0]))
 
     # Return results
     return(prob, x, b)
@@ -116,8 +121,6 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbose=Fal
     prob = LpProblem("mpc_DumbCharge", LpMinimize)
 
     # Init variables
-    global x
-    global b
     x = LpVariable.dicts("x", tvec, lowBound=0, upBound=xmax, cat='Continuous')
     b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=5000, cat='Continuous')
     i = LpVariable.dicts("i", tvec, lowBound=0, upBound=1, cat='Binary')

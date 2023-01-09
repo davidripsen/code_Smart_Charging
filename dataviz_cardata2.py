@@ -77,7 +77,7 @@ print("Number of different smart chard IDs:  ", D2.SMART_CHARGE_ID.unique().shap
 ############# Let's extract a single VEHICLE profile ########################################
 vehicle_ids = D2.VEHICLE_ID.unique()
 var = 'VEHICLE_ID'
-df_vehicle=None
+dfvehicle=None
 id = 13267
 def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plot_efficiency_and_SOCmin=True, vertical_hover=False, df_only=False):
     """
@@ -207,7 +207,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         df['use_ewm'] = df['use_ewm'].fillna(0)
 
         # Median prediction of efficiency
-        df['efficiency_median'] = df['efficiency'].median()
+        df['efficiency_median'] = np.median(df['efficiency'].dropna().unique())
 
         # Add vehicle id
         df['vehicle_id'] = id
@@ -471,24 +471,25 @@ dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=6093, plot_efficiency_and_SOC
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[89], vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, vertical_hover=False)
 
-ids = np.random.choice(vehicle_ids, 5, replace=False)
+ids = [1601, 30299, 6817, 18908] # Ids where perfect foresight fails
 for id in ids:
     print("Plotting vehicle", id)
-    dfv = PlotChargingProfile(D2, id=id, df_only=True)
+    dfv = PlotChargingProfile(D2, id=id, plot_efficiency_and_SOCmin=True)
 
 
 # Show the top 10 vehicles with the most charging sessions, where battery capacity >= 40 kWh
 DFV = []
 indx = D2['capacity_kwh'] >= 40
 vehicles_sorted = D2['VEHICLE_ID'][indx].value_counts().index
-bad_ids = [6366] # No bad ids :-)
+bad_ids = [6366, 3485] # No bad ids :-)
 N = 100 + len(bad_ids)
 for id in vehicles_sorted[:N]:
     if id in bad_ids:
         print("    [Skipping vehicle", id, "]")
         continue
     print("Plotting vehicle", id)
-    dfv = PlotChargingProfile(D2, id=id, df_only=False, plot_efficiency_and_SOCmin=False, vertical_hover=False)
+    dfv = PlotChargingProfile(D2, id=id, df_only=True, plot_efficiency_and_SOCmin=False, vertical_hover=False)
+    # Print efficiency for vehicle
     DFV.append(dfv)
 
 # Export list of vehicles
