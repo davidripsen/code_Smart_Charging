@@ -16,3 +16,8 @@ chapters:
 - file: A
 - file: B
 - file: C
+
+plugins:
+  - jekyll-toc
+
+toc: true
