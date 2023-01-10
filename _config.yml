@@ -4,3 +4,15 @@ description: Welcome to the interactive visualisations of David Ribberholt Ipsen
 author:
   name: David Ribberholt Ipsen
   email: david_ipsen@hotmail.com
+
+html:
+  use_issues_button: true
+  use_repository_button: true
+
+include:
+- _figures
+
+chapters:
+- file: A
+- file: B
+- file: C
