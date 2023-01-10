@@ -6,4 +6,9 @@ author:
   email: david_ipsen@hotmail.com
 
 include:
-  - _figures
+  - _figures/A
+  - _figures/B
+  - _figures/C
+  - A
+  - B
+  - C
