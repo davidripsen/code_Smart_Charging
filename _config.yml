@@ -1,3 +1,9 @@
 theme: jekyll-theme-minimal
 title: Smart Charging of Electric Vehicles
 description: Welcome to the interactive visualisations of David Ribberholt Ipsen's Masters Thesis
+author:
+  name: David Ribberholt Ipsen
+  email: david_ipsen@hotmail.com
+
+include:
+  - _figures

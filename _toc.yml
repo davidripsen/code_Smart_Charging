@@ -1,7 +1,0 @@
-chapters:
-#- file: markdown
-- file: hosted_figures/A
-- file: hosted_figures/B
-- file: hosted_figures/C
-#- file: notebooks
-#- file: markdown-notebooks
