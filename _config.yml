@@ -4,11 +4,3 @@ description: Welcome to the interactive visualisations of David Ribberholt Ipsen
 author:
   name: David Ribberholt Ipsen
   email: david_ipsen@hotmail.com
-
-include:
-  - _figures/A
-  - _figures/B
-  - _figures/C
-  - A
-  - B
-  - C
