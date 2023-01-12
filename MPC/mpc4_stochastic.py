@@ -242,13 +242,13 @@ for i in range(len(DFV)):
     #prob, x, b, flagFeasible = MultiDayStochastic(scenarios_all, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh = 6*24)
     #plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
-    #### Run the problem on mediods
-    # n_clusters=10
-    # mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
-    # h = 4*24 # 5 days horizon for the multi-day smart charge
-    # prob_stochKM, x, b, flag_AllFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
-    # plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
-    # #### Evt missing: Implement warmstart
+    ### Run the problem on mediods
+    n_clusters=20
+    mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
+    h = 4*24 # 5 days horizon for the multi-day smart charge
+    prob_stochKM, x, b, flag_AllFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
+    plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+    #### Evt missing: Implement warmstart
 
     if runDeterministicReference:
         ### Multi-Dayahead (Deterministic)
@@ -292,14 +292,16 @@ for i in range(len(DFV)):
     # However, it is (with h=4 days) # for DFV[3]                           Perfect Foresight < Day-Ahead < Stochastic < Stochastic + kMediods    < MutliDay                     (ACTUAL  )
     # <=> VERY DIFFERENT :((
 
+    # Visualise above plot with plotly
+    fig = go.Figure()
+    for i in range(n_clusters):
+        fig.add_trace(go.Scatter(x=np.arange(len(mediods[i])), y=mediods[i], name='Mediod '+str(i)))
+    fig.update_layout(title=str(n_clusters) + ' Mediods', xaxis_title='Time', yaxis_title='Price')
+    fig.show()
 
-    # # Visualise mediods
-    # fig, ax = plt.subplots(1,1, figsize=(10,5))
-    # ax.plot(mediods.T)
-    # ax.set_title(str(n_clusters) + ' Mediods')
-    # ax.set_xlabel('Hour')
-    # ax.set_ylabel('Price')
-    # plt.show()
+
+
+
 
     # ### Cumsum of costs for different models
     # costs_stochKM = np.cumsum(prob_stochKM['x'] * prob_stochKM['c'])

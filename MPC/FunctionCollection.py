@@ -12,7 +12,7 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbo
     # Init problem 
     prob = LpProblem("mpc1", LpMinimize)
 
-    # Init variabless
+    # Init variables
     x = LpVariable.dicts("x", tvec, lowBound=0, upBound=xmax, cat='Continuous')
     b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=bmax, cat='Continuous')
     s = LpVariable.dicts("s", tvec, lowBound=0, upBound=0.20*1.25*bmax, cat='Continuous')
