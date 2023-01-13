@@ -471,7 +471,7 @@ dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=6093, plot_efficiency_and_SOC
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[89], vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, vertical_hover=False)
 
-ids = [1601, 30299, 6817, 18908] # Ids where perfect foresight fails
+ids = [30299, 6817, 18908] # Ids where perfect foresight fails
 for id in ids:
     print("Plotting vehicle", id)
     dfv = PlotChargingProfile(D2, id=id, plot_efficiency_and_SOCmin=True)

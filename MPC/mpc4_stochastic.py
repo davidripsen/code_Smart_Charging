@@ -32,6 +32,9 @@ for i in range(len(DFV)):
                                                                                                                                                     uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
     if vehicle_id not in idsOfInterest:
         continue
+    else:
+        print(i)
+        
 
     #################################################### LET'S GO! ########################################################
 
@@ -163,10 +166,7 @@ for i in range(len(DFV)):
         # Study from first hour of prediciton up to and including the latest hour of known spot price
         L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
         # perfectForesight = False # Deleter
-
-        #L = 200 # Delete
-
-
+        
         # Init
         flag_AllFeasible = True
         prev_sol = None
@@ -208,24 +208,31 @@ for i in range(len(DFV)):
                 u_t_true = u[k]
 
                 # Solve
-                prob, x_d, b, x_s = StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, tvec, r, l, previous_solution=None, KMweights=KMweights, verbose=verbose)
-                if LpStatus[prob.status] != 'Optimal':
-                    flag_AllFeasible = False
-                    print("\n\nPlugged in = ", z[k],"=", z_i[0])
-                    print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
-                    print("u_true, u_forecast = ", u[k], u_forecast[0])
-                    print("b0 = ", b0, "b1 = ", value(b[1,0]))
-                    print("x = ", value(x_d[0]), "Trying  ", bmin[k+1],"<=", r*value(x_d[0])+b[0,0]-u[k], " <= ", bmax)
-                    print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j), " and l = " + str(l))
-                    print("\n\n\n")
+                if z_i[0] != 0:
+                    prob, x_d, b, x_s = StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, tvec, r, l, previous_solution=None, KMweights=KMweights, verbose=verbose)
+                    if LpStatus[prob.status] != 'Optimal':
+                        flag_AllFeasible = False
+                        print("\n\nPlugged in = ", z[k],"=", z_i[0])
+                        print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
+                        print("u_true, u_forecast = ", u[k], u_forecast[0])
+                        print("b0 = ", b0, "b1 = ", value(b[1,0]))
+                        print("x = ", value(x_d[0]), "Trying  ", bmin[k+1],"<=", r*value(x_d[0])+b[0,0]-u[k], " <= ", bmax)
+                        print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j), " and l = " + str(l))
+                        print("\n\n\n")
+                    x0 = value(x_d[0])
+                    b1 = value(b[1,0])
+                elif z_i[0] == 0: # Not plugged in
+                    print('Saving one iter')
+                    x0 = 0
+                    b1 = b0 + x0*r - u_t_true
 
                 # Implement/store only the first step, and re-run in next hour
-                x0 = value(x_d[0]); X[k]=x0;                # Amount charged in the now-hour
-                b1 = value(b[1,0]); B[k+1]=b1;              # Battery level after the now-hsecour / beggining of next hour
+                X[k]=x0;                # Amount charged in the now-hour
+                B[k+1]=b1;              # Battery level after the now-hsecour / beggining of next hour
                 costs += x0 * c[k];                         # Cost of charging in the now-hour
                 b0 = b1                                     # Next SOC start is the current SOC
                 k += 1
-                prev_sol = [x_d, x_s]                       # For warm-start
+                #prev_sol = [x_d, x_s]                       # For warm-start
 
                 # THE END
                 if k == L:
@@ -242,13 +249,12 @@ for i in range(len(DFV)):
     #prob, x, b, flagFeasible = MultiDayStochastic(scenarios_all, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh = 6*24)
     #plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
-    ### Run the problem on mediods
-    n_clusters=20
-    mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
-    h = 4*24 # 5 days horizon for the multi-day smart charge
-    prob_stochKM, x, b, flag_AllFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
-    plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
-    #### Evt missing: Implement warmstart
+    # ### Run the problem on mediods
+    # n_clusters=10
+    # mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
+    # h = 4*24 # 5 days horizon for the multi-day smart charge
+    # prob_stochKM, x, b, flag_AllFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
+    # plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
     if runDeterministicReference:
         ### Multi-Dayahead (Deterministic)
@@ -280,8 +286,8 @@ for i in range(len(DFV)):
         flagFeasible_pf = LpStatus[prob.status] == 'Optimal'; print('Perfect Foresight: ', flagFeasible_pf, '  Vehile_id=', vehicle_id)
         plot_EMPC(prob, 'Perfect Foresight   of vehicle = ' + str(vehicle_id), x, b, u_within, c_within, z_within,  starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
             # Verify the objective value
-        print("Objective value = ", prob.objective.value())
-        print("Objective value = ", np.sum([value(x[t]) * c_within[t] for t in tvec_within]) - c_tilde * (value(b[T+1]) - b[0]))
+        #print("Objective value = ", prob.objective.value())
+        #print("Objective value = ", np.sum([value(x[t]) * c_within[t] for t in tvec_within]) - c_tilde * (value(b[T+1]) - b[0]))
 
         # ### DumbCharge
         # prob_dc, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r, verbose=False)
@@ -292,12 +298,30 @@ for i in range(len(DFV)):
     # However, it is (with h=4 days) # for DFV[3]                           Perfect Foresight < Day-Ahead < Stochastic < Stochastic + kMediods    < MutliDay                     (ACTUAL  )
     # <=> VERY DIFFERENT :((
 
-    # Visualise above plot with plotly
-    fig = go.Figure()
-    for i in range(n_clusters):
-        fig.add_trace(go.Scatter(x=np.arange(len(mediods[i])), y=mediods[i], name='Mediod '+str(i)))
-    fig.update_layout(title=str(n_clusters) + ' Mediods', xaxis_title='Time', yaxis_title='Price')
-    fig.show()
+
+# Visualise mediods
+fig = go.Figure()
+for i in range(n_clusters):
+    fig.add_trace(go.Scatter(x=np.arange(len(mediods[i])), y=mediods[i], name='Mediod '+str(i)))
+fig.update_layout(title=str(n_clusters) + ' Mediods', xaxis_title='Time', yaxis_title='Price')
+fig.update_yaxes(range=[-3, 3])
+fig.show()
+
+# Visualise n scenarios
+fig = go.Figure()
+for i in range(n_clusters):
+    fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)))
+fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
+fig.update_yaxes(range=[-3, 3])
+fig.show()
+
+# Visualise first 50 scenarios
+fig = go.Figure()
+for i in range(50):
+    fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)))
+fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
+fig.update_yaxes(range=[-3, 3])
+fig.show()
 
 
 

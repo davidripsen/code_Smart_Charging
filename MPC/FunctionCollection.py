@@ -14,8 +14,8 @@ def PerfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbo
 
     # Init variables
     x = LpVariable.dicts("x", tvec, lowBound=0, upBound=xmax, cat='Continuous')
-    b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=bmax, cat='Continuous')
-    s = LpVariable.dicts("s", tvec, lowBound=0, upBound=0.20*1.25*bmax, cat='Continuous')
+    b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=bmax*1.25, cat='Continuous')
+    s = LpVariable.dicts("s", tvec, lowBound=0, upBound=0.25*bmax, cat='Continuous')
     s2 = {i: LpVariable("s2_"+str(i), lowBound=0, upBound=ub, cat='Continuous') for i, ub in enumerate(bmin)}
     b[0] = b0
 
@@ -78,7 +78,7 @@ def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u_t_true, u_forecast, z
     # Return results
     return(prob, x, b)
 
-def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, z=np.nan, starttime='', endtime='', export=False, BatteryCap=60, firsthour=0):
+def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, z=np.nan, starttime='', endtime='', export=False, export_only = False, BatteryCap=60, firsthour=0, vehicle_id=''):
         # Identify iterative-appended, self-made prob
     fig = go.Figure()
     if type(prob) == dict:
@@ -110,11 +110,17 @@ def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, z=np.nan, s
     fig.update_layout(title=name + "    from " + starttime +" to "+ endtime+"      Total cost: " + str(round(obj)) + " DKK  (+tariffs)",
         xaxis_title="Days",
         yaxis_title="kWh  or  DKK/kWh  or  Plugged-in [T/F]")
-    fig.show()
+    if not export_only:
+        fig.show()
 
     ## Export figure
     if export:
-        fig.write_html( "plots/MPC/" + name + "_mpc.html")
+        if vehicle_id != '':
+            # Make vehicle_unique folder
+            vehicle_id = str(vehicle_id) + "/"
+            if not os.path.exists("plots/MPC/"+vehicle_id):
+                os.makedirs("plots/MPC/"+vehicle_id)
+        fig.write_html( "plots/MPC/"+vehicle_id + name + "_mpc.html")
 
 def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbose=False):
     # Init problem
@@ -124,7 +130,7 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbose=Fal
     x = LpVariable.dicts("x", tvec, lowBound=0, upBound=xmax, cat='Continuous')
     b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=5000, cat='Continuous')
     i = LpVariable.dicts("i", tvec, lowBound=0, upBound=1, cat='Binary')
-    s = LpVariable.dicts("s", tvec, lowBound=0, upBound=0.20*1.25*bmax, cat='Continuous')
+    s = LpVariable.dicts("s", tvec, lowBound=0, upBound=0.25*bmax, cat='Continuous')
     #s2 = LpVariable.dicts("s2", tvec, lowBound=0, upBound=bmin, cat='Continuous')
     s2 = {i: LpVariable("s2_"+str(i), lowBound=0, upBound=ub, cat='Continuous') for i, ub in enumerate(bmin)}
     b[0] = b0
@@ -254,6 +260,7 @@ def getMediods(scenarios, n_clusters):
     # Return mediods and cluster proportions
     return(mediods, cluster_proportions)
 
+# Maintained here
 def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, verbose=False):
 
     # Study from first hour of prediciton up to and including the latest hour of known spot price
@@ -304,24 +311,30 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             u_t_true = u[k]
 
             # Solve
-            prob, x_d, b, x_s = StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, tvec, r, l, previous_solution=None, KMweights=KMweights, verbose=verbose)
-            if LpStatus[prob.status] != 'Optimal':
-                flag_AllFeasible = False
-                print("\n\nPlugged in = ", z[k],"=", z_i[0])
-                print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
-                print("u_true, u_forecast = ", u[k], u_forecast[0])
-                print("b0 = ", b0, "b1 = ", value(b[1,0]))
-                print("x = ", value(x_d[0]), "Trying  ", bmin[k+1],"<=", r*value(x_d[0])+b[0,0]-u[k], " <= ", bmax)
-                print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j), " and l = " + str(l))
-                print("\n\n\n")
+            if z_i[0] != 0:
+                prob, x_d, b, x_s = StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, tvec, r, l, previous_solution=None, KMweights=KMweights, verbose=verbose)
+                if LpStatus[prob.status] != 'Optimal':
+                    flag_AllFeasible = False
+                    print("\n\nPlugged in = ", z[k],"=", z_i[0])
+                    print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
+                    print("u_true, u_forecast = ", u[k], u_forecast[0])
+                    print("b0 = ", b0, "b1 = ", value(b[1,0]))
+                    print("x = ", value(x_d[0]), "Trying  ", bmin[k+1],"<=", r*value(x_d[0])+b[0,0]-u[k], " <= ", bmax)
+                    print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j), " and l = " + str(l))
+                    print("\n\n\n")
+                x0 = value(x_d[0])
+                b1 = value(b[1,0])
+            elif z_i[0] == 0: # Not plugged in
+                x0 = 0
+                b1 = b0 + x0*r - u_t_true
 
             # Implement/store only the first step, and re-run in next hour
-            x0 = value(x_d[0]); X[k]=x0;                # Amount charged in the now-hour
-            b1 = value(b[1,0]); B[k+1]=b1;              # Battery level after the now-hsecour / beggining of next hour
+            X[k]=x0;                # Amount charged in the now-hour
+            B[k+1]=b1;              # Battery level after the now-hsecour / beggining of next hour
             costs += x0 * c[k];                         # Cost of charging in the now-hour
             b0 = b1                                     # Next SOC start is the current SOC
             k += 1
-            prev_sol = [x_d, x_s]                       # For warm-start
+            #prev_sol = [x_d, x_s]                       # For warm-start
 
             # THE END
             if k == L:
@@ -383,21 +396,27 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
             
 
             # Solve
-            prob, x, b = ImperfectForesight(b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, h, tvec, r, verbose=False) # Yes, it is tvec=0..h, NOT tvec_i
-            #print("Status:", LpStatus[prob.status])
-            if LpStatus[prob.status] != 'Optimal':
-                flag_AllFeasible = False
-                print("\n\nPlugged in = ", z[k],"=", z_i[0])
-                print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
-                print("u = ", u[k], u_forecast[0])
-                print("b0 = ", b0, "b1 = ", value(b[1]))
-                print("x = ", value(x[0]), "Trying  ", bmin[k+1],"<=", r*value(x[0])+b0-u[k], " <= ", bmax)
-                print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j))
-                print("\n\n\n")
-            
+            if z_i[0] != 0:
+                prob, x, b = ImperfectForesight(b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, h, tvec, r, verbose=False) # Yes, it is tvec=0..h, NOT tvec_i
+                #print("Status:", LpStatus[prob.status])
+                if LpStatus[prob.status] != 'Optimal':
+                    flag_AllFeasible = False
+                    print("\n\nPlugged in = ", z[k],"=", z_i[0])
+                    print("bmin = ", round(bmin[k]), round(bmin_i[0]), "bmin_t+1 = ", round(bmin_i[1]))
+                    print("u = ", u[k], u_forecast[0])
+                    print("b0 = ", b0, "b1 = ", value(b[1]))
+                    print("x = ", value(x[0]), "Trying  ", bmin[k+1],"<=", r*value(x[0])+b0-u[k], " <= ", bmax)
+                    print("Infeasible at k = " + str(k) + " with i = " + str(i) + " and j = " + str(j))
+                    print("\n\n\n")
+                x0 = value(x[0])
+                b1 = value(b[1])
+            elif z_i[0] == 0: # Not plugged in
+                x0 = 0
+                b1 = b0 + x0*r - u_t_true
+
             # Implement/store only the first step, and re-run in next hour
-            x0 = value(x[0]); X[k]=x0;                # Amount charged in the now-hour
-            b1 = value(b[1]); B[k+1]=b1;              # Battery level after the now-hour / beggining of next hour
+            X[k]=x0;                # Amount charged in the now-hour
+            B[k+1]=b1;              # Battery level after the now-hour / beggining of next hour
             costs += x0 * c[k];                       # Cost of charging in the now-hour
             b0 = b1                                   # Next SOC start is the current SOC
             k += 1
@@ -458,7 +477,8 @@ def ExtractEVdataForMPC(dfv, z_var, u_var, uhat_var, bmin_var, p):
     # Input
     bmin = dfv[bmin_var].to_numpy()
     # Vehicle parameters
-    bmax = dfv['SOCmax'].median()
+    #bmax = dfv['SOCmax'].median()
+    bmax = 0.8*dfv['BatteryCapacity'].median()
     #bmax = np.nanmin([dfv['SOCmax'], dfv['BatteryCapacity']], axis=0)
     xmax = dfv['CableCapacity'].unique()[0]
     c_tilde = np.quantile(dfspot['TruePrice'], p) #min(c[-0:24]) # Value of remaining electricity: lowest el price the past 24h

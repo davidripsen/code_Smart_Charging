@@ -15,7 +15,7 @@ pd.set_option('display.max_rows', 500)
 
 # # Read EV user data
 # df = pd.read_csv('data/Monta/2022_11_03 10_15.csv', sep=',', header=0, parse_dates=True) # All charges
-# df2 = pd.read_csv('data/Monta/charge_smart_charges.csv', sep=',', header=0, parse_dates=True) # Smart Charges.    Can be mapped to All Charges on df2.id == df.Smart_Charge_ID
+df2 = pd.read_csv('data/Monta/charge_smart_charges.csv', sep=',', header=0, parse_dates=True) # Smart Charges.    Can be mapped to All Charges on df2.id == df.Smart_Charge_ID
 # df_vis = pd.read_excel('data/Monta/core.core_charges.xlsx')
 # #dfA1 = pd.read_csv('data/Monta/charges_part1.csv', sep=',', header=0, parse_dates=True, low_memory=False)
 # #dfA2 = pd.read_csv('data/Monta/charges_part2.csv', sep=',', header=0, parse_dates=True, low_memory=False)
@@ -216,8 +216,10 @@ fig.update_layout(
     ),
 )
 fig.show()
+# Export figure
+fig.write_html( "plots/EV_Monta/3D_scatterplot_priorities.html")
 
-df2['priority_price'].describe()
+df2['priority_price'].describe() # 82 % average for price
 
 
 # Plot daily, weekly and daily-weekly pattern of start_time and stop_time
