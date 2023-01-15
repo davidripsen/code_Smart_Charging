@@ -155,7 +155,7 @@ def DumbCharge(b0, bmax, bmin, xmax, c, c_tilde, u, z, T, tvec, r=1, verbose=Fal
         prob += x[t] <= z[t]*xmax
         prob += x[t] <= (bmax+s[t]-b[t]) / r             # s[t] er tilføjet for at undgå, at x[t] tvinges negativ, når b[t] er en smule højere end bmax
         prob += x[t] >= (z[t]*xmax - M*(1-i[t]))         # i = 1 betyder, at der lades max kapacitet
-        prob += x[t] >= (bmax+s[t]-b[t] - M*i[t])  / r   # i = 0 betyder, at vi kun kan lade de resterende til 80 eller 100 % SOC
+        prob += x[t] >= (bmax+s[t]-b[t]) / r - M*i[t]   # i = 0 betyder, at vi kun kan lade de resterende til 80 eller 100 % SOC
         #prob += i[t] <= z[t]
 
     # Solve problem
