@@ -8,3 +8,4 @@ Checkout [visualisations](https://davidripsen.github.io/code_Smart_Charging/) to
 [1](https://davidripsen.github.io/code_Smart_Charging/_figures/A)
 [2](https://davidripsen.github.io/code_Smart_Charging/_figures/B)
 [3](https://davidripsen.github.io/code_Smart_Charging/_figures/C) 
+[4](https://davidripsen.github.io/code_Smart_Charging/_figures/spotprices) 
