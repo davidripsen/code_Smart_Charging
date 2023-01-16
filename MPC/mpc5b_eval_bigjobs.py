@@ -11,8 +11,7 @@ sns.set_theme()
 pio.renderers.default = "browser"
 pd.set_option('display.max_rows', 200)
 
-folder = '11-01-2023__22h_35m_10s'
-#D = pd.read_csv('results/'+folder+'/relativePerformances.csv')
+folder = '13-01-2023__15h_51m_28s'
 D = pd.read_csv('results/'+folder+'/relativePerformances.csv')
 D = D[D != ' - ']
 D = D.dropna()
@@ -22,20 +21,14 @@ Dres = Dres[Dres != ' - ']
 Dres = Dres.dropna()
 Dres = Dres.astype(float)
 Dres.columns = [col.replace('obj_','') for col in Dres.columns]
+I = pd.read_csv('results/'+folder+'/infeasibles.csv')
+Dfeas = D[I != ' x '].dropna() # Drop infeasible solutions
 
 # Summary statistics
 round(D.describe(),2)
 round(D.median(),2)
 
-# Make one plot of all the histograms of the values from each model using plotly. Give them distinct colors.
-fig = go.Figure()
-for i, col in enumerate(D.columns):
-    if col not in ['pf','dc','vehicle_id']:
-        fig.add_trace(go.Histogram(x=D[col], name=col, nbinsx=20, opacity=0.75, marker_color=px.colors.qualitative.Plotly[i%10]))
-#fig.update_layout(barmode='overlay')
-fig.update_traces(opacity=0.75)
-fig.update_layout(title_text='Histogram of relative performances of the models', title_x=0.5)
-fig.show()
+round(Dfeas.describe(),2)
 
 # Make a boxplot of the values from each model using plotly. Give them distinct colors.
 fig = go.Figure()
@@ -43,6 +36,14 @@ for i, col in enumerate(D.columns):
     if col not in ['pf','dc','vehicle_id']:
         fig.add_trace(go.Box(y=D[col], name=col, boxpoints='all', jitter=0.3, pointpos=-1.8, marker_color=px.colors.qualitative.Plotly[i%10]))
 fig.update_layout(title_text='Boxplot of relative performances of the models', title_x=0.5)
+fig.show()
+
+# Repeat for only strictly feasible solutions
+fig = go.Figure()
+for i, col in enumerate(Dfeas.columns):
+    if col not in ['pf','dc','vehicle_id']:
+        fig.add_trace(go.Box(y=Dfeas[col], name=col, boxpoints='all', jitter=0.3, pointpos=-1.8, marker_color=px.colors.qualitative.Plotly[i%10]))
+fig.update_layout(title_text='Boxplot of relative performances of the models (only strictly feasible solutions)', title_x=0.5)
 fig.show()
 
 # Calculate two-sample PAIRED t-test for each model pair and write nicely in an pandas dataframe
