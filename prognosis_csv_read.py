@@ -17,6 +17,9 @@ pd.set_option('display.max_rows', 500)
 plot = True
 plot_alot = True
 use_carnot = True
+layout = dict(font=dict(family='Computer Modern',size=11),
+              margin=dict(l=5, r=5, t=30, b=5),
+              width=605, height= 250)
 
 # Read the csv files
 #df = pd.read_csv('data/forecastsGreenerEl/prognoser.csv', sep=',', header=0, parse_dates=True)
@@ -314,19 +317,26 @@ minH = df['Atime'].value_counts().min()
 pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Carnot/Sliced_Predictions_movie_Carnot="+str(use_carnot)+".pdf")
 if plot: # Change to run=True for plotting
     for i, Atime in enumerate(dfp['Atime'][:K_plots]):
-        fig = plt.figure()
-        plt.plot(np.arange(0,minH+1), dfp.iloc[i,3:(3+minH+1)], label='PredictedPrice')
-        plt.plot(np.arange(0,minH+1), dft.iloc[i,3:(3+minH+1)], label='TruePrice', linestyle='--')
-        plt.title('PredictedPrice vs TruePrice')
-        plt.xlabel('Time [h]     from ' + str(Atime))
-        plt.ylabel('Price [DKK/kWh]')
+        fig = plt.figure(figsize=(6.3, 2.6))
+        plt.plot(np.arange(0,minH+1), dfp.iloc[i,3:(3+minH+1)], label='Predicted price')
+        plt.plot(np.arange(0,minH+1), dft.iloc[i,3:(3+minH+1)], label='True price', linestyle='--')
+        plt.title('Predicted price vs True price')
+        plt.xlabel('Time [h]')
+        plt.ylabel('Price   [DKK/kWh]')
         plt.ylim([-0.1, df.PredPrice.max()])
         plt.grid(axis='x', linestyle='-')
         plt.xticks(np.arange(0, minH+1, 1.0))
-        plt.axvline(x=Atime, color='r', linestyle='--', label='Atime of forecast')
+        plt.axvline(x=Atime, color='r', linestyle='--', label='Actual time of forecast')
         plt.tight_layout()
         plt.legend(loc='upper right')
-        #plt.show()
+        # Change layout to the defined layout
+        #fig.set_size_inches(6.3, 2.6)
+        fig.tight_layout()
+        # Change font
+        plt.rcParams.update({'font.size': 11})
+        plt.rcParams.update({'font.family': 'Computer Modern Roman'})
+
+        plt.show()
         #fig.savefig('plots/PredMovie2/PredictedPrice_' + str(Atime) + '.pdf')
         pdf.savefig(fig)
     pdf.close()
