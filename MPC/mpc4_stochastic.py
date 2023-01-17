@@ -250,8 +250,8 @@ for i in range(len(DFV)):
     #plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
     # ### Run the problem on mediods
-    # n_clusters=10
-    # mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
+    n_clusters=10
+    mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
     # h = 4*24 # 5 days horizon for the multi-day smart charge
     # prob_stochKM, x, b, flag_AllFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
     # plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)

@@ -74,14 +74,14 @@ for i in range(len(DFV)):
         prob_stoch, x, b, flagFeasible_stoch = MultiDayStochastic(scenarios, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, KMweights=None)
         results['stoch'+str(h)][i] = round(prob_stoch['objective'],2)
         infeasibles['stoch'+str(h)][i] = '  ' if flagFeasible_stoch else ' x '
-        #plot_EMPC(prob_stoch, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=True, firsthour=firsthour, vehicle_id=vehicle_id)
+        plot_EMPC(prob_stoch, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=True, firsthour=firsthour, vehicle_id=vehicle_id)
 
         # Stochastic with kMediods
         #h = 4*24 # 5 days horizon for the multi-day smart charge
         prob_stochKM, x, b, flagFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, KMweights=weights)
         results['stochKM'+str(h)][i] = round(prob_stochKM['objective'],2)
         infeasibles['stochKM'+str(h)][i] = '  ' if flagFeasible_stochKM else ' x '
-        #plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
+        plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
         #### Evt missing: Implement warmstart
 
         if runDeterministicReference:
@@ -90,7 +90,7 @@ for i in range(len(DFV)):
             prob_mda, x, b, flagFeasible_mda = MultiDay(dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=False)
             results['mda'+str(h)][i] = round(prob_mda['objective'],2)
             infeasibles['mda'+str(h)][i] = '  ' if flagFeasible_mda else ' x '
-            #plot_EMPC(prob_mda, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
+            plot_EMPC(prob_mda, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
 
 
     if runDeterministicReference:

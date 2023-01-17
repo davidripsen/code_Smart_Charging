@@ -12,14 +12,19 @@ import plotly.express as px
 from matplotlib import pyplot as plt
 import matplotlib.backends.backend_pdf
 import seaborn as sns
-sns.set_theme()
+
 pd.set_option('display.max_rows', 500)
 plot = True
 plot_alot = True
 use_carnot = True
+# Plotly layout
 layout = dict(font=dict(family='Computer Modern',size=11),
               margin=dict(l=5, r=5, t=30, b=5),
               width=605, height= 250)
+# Matplotlib layout
+sns.set_theme()
+plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Computer Modern Serif', 'font.size': 11, 'figure.figsize': (6.3, 2.6), 'text.usetex': True})
+
 
 # Read the csv files
 #df = pd.read_csv('data/forecastsGreenerEl/prognoser.csv', sep=',', header=0, parse_dates=True)
@@ -64,11 +69,16 @@ if use_carnot:
 
     # Cut away forecasts after 2022-11-11
     df = df[df['Atime'] < '2022-11-11']
-    horizons = df.Atime.value_counts()
     if plot_alot:
-        horizons.hist(bins=60)
-        plt.title('Distribution of forecasts lengths')
-        plt.show()
+        horizons = df.Atime.value_counts()
+        plt.hist(horizons, bins=60, label="Prior processing")
+        plt.xlim(0, 170)
+        plt.ylim(0, 600)
+        plt.title('Distribution of forecasts lengths (prior processing)')
+        plt.xlabel('Forecast length [h]')
+        plt.ylabel('Number of forecasts')
+        #plt.savefig('plots/Carnot/Forecast_Lengths_priorprocessed.pdf', bbox_inches='tight')
+        #plt.show()
 
     # Cut away forecasts with less than 168 values
     min_horizon = 96
@@ -77,20 +87,24 @@ if use_carnot:
 
     # Is there big gaps in Atime?
     print("Is there big gaps in Atime?")
-    Atime_diff = pd.Series(df.Atime.unique()).diff().dt.seconds
-    # Plotly histogram of Atime_diff
-    if plot_alot:
-        fig = px.histogram(Atime_diff, x=Atime_diff, nbins=100)
-        fig.show()
+    Atime_diff = pd.Series(df.Atime.unique()).diff().dt.seconds / 3600
+    # histogram of Atime_diff
+    # if plot_alot:
+    #     plt.hist(Atime_diff, bins=100)
+    #     plt.title('Distribution of Atime differences')
+    #     plt.xlabel('Atime difference [h]')
+    #     plt.ylabel('Number of Atime differences')
+        #plt.savefig('plots/Carnot/Atime_diff.pdf', bbox_inches='tight')
+        #plt.show()
     Atimes = df.Atime.unique()
     [str(i) for i in Atimes]
 
     # Plot a timeseries for Atime[44] using plotly
-    i = 78 # i=23
-    if plot_alot:
-        fig = px.line(df[df['Atime'] == Atimes[i]], x='Time', y='PredPrice', title='Carnot forecast for Atime number '+ str(i))
-        fig.update_xaxes(rangeslider_visible=True)
-        fig.show()
+    # i = 78 # i=23
+    # if plot_alot:
+    #     fig = px.line(df[df['Atime'] == Atimes[i]], x='Time', y='PredPrice', title='Carnot forecast for Atime number '+ str(i))
+    #     fig.update_xaxes(rangeslider_visible=True)
+    #     fig.show()
 
     for i in [4, 78, 209, 700, 900, 1200, 1241]:
         print(df[df['Atime'] == Atimes[i]])
@@ -192,6 +206,27 @@ del dfspot
 
 
 
+
+
+
+
+
+
+
+
+if plot_alot:
+    horizons = df.Atime.value_counts()
+    plt.hist(horizons, bins=60, label='Post processing')
+    plt.title('Distribution of forecasts lengths')
+    plt.xlim(0, 170)
+    plt.xlabel('Forecast length [h]')
+    plt.ylabel('Number of forecasts')
+    plt.legend()
+    # Set typography for this plot only
+    #plt.show()
+    # Export plt
+    plt.savefig('plots/Carnot/Forecast_Lengths_postprocessed.pdf', bbox_inches='tight')
+
 # Plot Price vs TruePrice using plotly
 if plot_alot:
     import plotly.graph_objects as go
@@ -204,7 +239,7 @@ if plot_alot:
 # For each unique Atime, plot the Price and TruePrice using matplotlib and save to pdf
 pdf = matplotlib.backends.backend_pdf.PdfPages("plots/ModPredictions_movie_CARNOT="+str(use_carnot)+".pdf")
 if plot: # Change to run=True for plotting
-    for Atime in df['Atime'].unique():
+    for Atime in df['Atime'].unique()[3:4]:
         dfA = df[df['Atime'] == Atime]
         fig = plt.figure()
         plt.plot(dfA['Time'], dfA['PredPrice'], label='PredPrice')
@@ -284,8 +319,8 @@ def SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=None, 
             for i in range(0, wk):
                 df2.loc[j, 't' + str(i)] = dftrue.loc[j, 't' + str(i)]
     return df2
-dft = SliceDataFrame(df, h, var='TruePrice', BigM=BigM) #df with TruePrice as values
-dfp = SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
+#dft = SliceDataFrame(df, h, var='TruePrice', BigM=BigM) #df with TruePrice as values
+#dfp = SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
 
 if not use_carnot:
     # df with only known prices, for imput to Day-Ahead Smart Charge
@@ -303,9 +338,9 @@ if not use_carnot:
     dfk.fillna(BigM, inplace=True)
     dfk.to_csv('data/MPC-ready/df_knownprices_for_mpc.csv', index=False)
 
-# Export to csv
-dft.to_csv('data/MPC-ready/df_trueprices_for_mpc.csv', index=False)
-dfp.to_csv('data/MPC-ready/df_predprices_for_mpc.csv', index=False)
+### Export to csv
+#dft.to_csv('data/MPC-ready/df_trueprices_for_mpc.csv', index=False)
+#dfp.to_csv('data/MPC-ready/df_predprices_for_mpc.csv', index=False)
 
 # Import from csv
 dft = pd.read_csv('data/MPC-ready/df_trueprices_for_mpc.csv')
@@ -314,29 +349,28 @@ dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv')
 # For each Atime plot the Predicted Price (dfp) and TruePrice (dft) throughout the horizon
 K_plots = len(dfp['Atime'].unique()) # 200
 minH = df['Atime'].value_counts().min()
-pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Carnot/Sliced_Predictions_movie_Carnot="+str(use_carnot)+".pdf")
+pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Carnot/PredictionMovie_Carnot.pdf")
 if plot: # Change to run=True for plotting
     for i, Atime in enumerate(dfp['Atime'][:K_plots]):
         fig = plt.figure(figsize=(6.3, 2.6))
-        plt.plot(np.arange(0,minH+1), dfp.iloc[i,3:(3+minH+1)], label='Predicted price')
-        plt.plot(np.arange(0,minH+1), dft.iloc[i,3:(3+minH+1)], label='True price', linestyle='--')
-        plt.title('Predicted price vs True price')
+        plt.plot(np.arange(0,minH+1), dfp.iloc[i,3:(3+minH+1)], label='Predicted')
+        plt.plot(np.arange(0,minH+1), dft.iloc[i,3:(3+minH+1)], label='True', linestyle='--')
+        plt.title('Spot Price Forecasts')
         plt.xlabel('Time [h]')
         plt.ylabel('Price   [DKK/kWh]')
         plt.ylim([-0.1, df.PredPrice.max()])
         plt.grid(axis='x', linestyle='-')
         plt.xticks(np.arange(0, minH+1, 1.0))
-        plt.axvline(x=Atime, color='r', linestyle='--', label='Actual time of forecast')
+        plt.axvline(x=Atime, color='r', linestyle='--')
         plt.tight_layout()
         plt.legend(loc='upper right')
-        # Change layout to the defined layout
-        #fig.set_size_inches(6.3, 2.6)
+        # Decrease font size of legend
+        leg = plt.gca().get_legend()
+        ltext  = leg.get_texts()
+        plt.setp(ltext, fontsize='small')
         fig.tight_layout()
         # Change font
-        plt.rcParams.update({'font.size': 11})
-        plt.rcParams.update({'font.family': 'Computer Modern Roman'})
-
-        plt.show()
+        #plt.show()
         #fig.savefig('plots/PredMovie2/PredictedPrice_' + str(Atime) + '.pdf')
         pdf.savefig(fig)
     pdf.close()

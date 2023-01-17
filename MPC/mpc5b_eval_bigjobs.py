@@ -30,6 +30,7 @@ round(D.median(),2)
 
 round(Dfeas.describe(),2)
 
+
 # Make a boxplot of the values from each model using plotly. Give them distinct colors.
 fig = go.Figure()
 for i, col in enumerate(D.columns):

@@ -11,7 +11,20 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import datetime as dt
-plot=False
+import seaborn as sns
+path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/Carnot'
+pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures'
+
+plot=True
+# Plotly layout
+layout = dict(font=dict(family='Computer Modern',size=11),
+              margin=dict(l=5, r=5, t=30, b=5),
+              width=605, height= 250,
+              title_x = 0.5)
+
+# Matplotlib layout
+plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Computer Modern Serif', 'font.size': 11, 'figure.figsize': (6.3, 2.6), 'text.usetex': True})
+
 
 # Read the dfp and dft
 dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
@@ -31,10 +44,10 @@ dfr = dfr.replace(BigM, np.nan)
 
 # Make beautiful matplotlib histograms of the residuals for each time step and save them all in one pdf
 maxstep = 145
-steps = dfr.columns[2:(2+maxstep)]
+steps = dfr.columns[3:(3+maxstep)]
 
 if plot:
-    pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Histograms_of_residuals_per_timestep_Carnot.pdf")
+    pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Carnot/Histograms_of_residuals_per_timestep_Carnot.pdf")
     for step in steps:
         fig = plt.figure()
         plt.hist(dfr[step][~np.isnan(dfr[step])], bins=50, density=True)
@@ -51,7 +64,7 @@ if plot:
             plt.plot(x, p, 'k', linewidth=1, linestyle='--')
 
         plt.xlabel('Residual')
-        plt.ylabel('Densiy')
+        plt.ylabel('Density')
         plt.xlim([-5,5])
         plt.ylim([0,0.65])
         #plt.show()
@@ -113,8 +126,13 @@ if plot:
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=mu.index, y=mu.values, mode='lines+markers', name='Mean'))
     fig.update_layout(title='Mean of the residuals per timestep', xaxis_title='Timestep', yaxis_title='Mean')
-    fig.write_html("plots/Mean_of_residuals_per_timestep_Carnot.html")
+    # Center title
+    fig.update_layout(showlegend=False)
+    fig.write_html(pathhtml + "/Mean_of_residuals_per_timestep_Carnot.html")
     fig.show()
+    fig.update_layout(layout)
+    fig.write_image(path + "/Mean_of_residuals_per_timestep_Carnot.pdf")
+    #
 
 # Visualise covariance matrix
 if plot:
@@ -124,8 +142,12 @@ if plot:
             y=np.arange(maxstep),#cov.columns,
             colorscale='Viridis'))
     fig.update_layout(title='Covariance matrix of residuals per timestep', xaxis_title='Timestep', yaxis_title='Timestep')
+    # Center title
+    fig.update_layout(showlegend=False)
+    fig.write_html(pathhtml + "/Covariance_matrix_of_residuals_Carnot.html")
     fig.show()
-    fig.write_html("plots/Covariance_matrix_of_residuals_Carnot.html")
+    fig.update_layout(layout)
+    fig.write_image(path + "/Covariance_matrix_of_residuals_Carnot.pdf")
 
 
 # Generate 100 samples from the multivariate normal distribution
@@ -137,21 +159,26 @@ np.savetxt("./data/MPC-ready/scenarios.csv", samples, delimiter=",")
 
 # Visualise the time series of the samples and add 95 % prediction interval
 if plot:
+    samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 20000)
     fig = go.Figure()
     # Add theoretical mean
-    fig.add_trace(go.Scatter(x=mu.index, y=mu.values, mode='lines', name='Mean of distribution', line=dict(color='black', width=1)))
+    fig.add_trace(go.Scatter(x=mu.index, y=mu.values, mode='lines', name='Mean', line=dict(color='black', width=1)))
     # Add 95% confidence interval
-    fig.add_trace(go.Scatter(x=mu.index, y=mu.values+1.96*np.sqrt(np.diag(cov)), mode='lines', name='95% confidence intervals (Wald)', line=dict(width=1, color='red')))
-    fig.add_trace(go.Scatter(x=mu.index, y=mu.values-1.96*np.sqrt(np.diag(cov)), mode='lines', name='', line=dict(width=1, color='red')))
+    fig.add_trace(go.Scatter(x=mu.index, y=mu.values+1.96*np.sqrt(np.diag(cov)), mode='lines', name='95% CI (Wald)', line=dict(width=1, color='red')))
+    fig.add_trace(go.Scatter(x=mu.index, y=mu.values-1.96*np.sqrt(np.diag(cov)), mode='lines', name='2.5% CI (Wald)', line=dict(width=1, color='red')))
     # Calculate emperical 95 % quantiles from samples
     quantiles = np.quantile(samples, [0.025, 0.975], axis=0)
-    fig.add_trace(go.Scatter(x=mu.index, y=quantiles[0,:], mode='lines', name='95% quantiles of samples', line=dict(width=1, color='red', dash='dash')))
-    fig.add_trace(go.Scatter(x=mu.index, y=quantiles[1,:], mode='lines', name='', line=dict(width=1, color='red', dash='dash')))
+    fig.add_trace(go.Scatter(x=mu.index, y=quantiles[0,:], mode='lines', name='95% quantile', line=dict(width=1, color='red', dash='dash')))
+    fig.add_trace(go.Scatter(x=mu.index, y=quantiles[1,:], mode='lines', name='2.5% quantile', line=dict(width=1, color='red', dash='dash')))
     for i in range(0,100):
         fig.add_trace(go.Scatter
-            (x=mu.index, y=samples[i,:], mode='lines', name='Sample '+str(i), line=dict(width=0.5, color='gray')))
-    fig.update_layout(title='Samples from the multivariate normal distribution', xaxis_title='Timestep', yaxis_title='Residual')
+            (x=mu.index, y=samples[i,:], mode='lines', name="Sample "+str(i), line=dict(width=0.5, color='gray')))
+    fig.update_layout(title='Statistical scenarios sampled from the multivariate normal distribution', xaxis_title='Timestep', yaxis_title='Residual')
+    # Have legend inside plot at the right
+    # Center title
+    fig.write_html(pathhtml + "/Samples_from_multivariate_normal_distribution_Carnot.html")
     fig.show()
-    fig.write_html("plots/Samples_from_multivariate_normal_distribution_Carnot.html")
+    fig.update_layout(layout)
+    fig.write_image(path + "/Samples_from_multivariate_normal_distribution_Carnot.pdf")
 
     # = Prediction interval (under correct model assumption)
