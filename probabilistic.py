@@ -5,6 +5,7 @@ In order to later generate scenarios for stochastic optimization
 
 # Imports
 import numpy as np
+from sklearn.covariance import ShrunkCovariance
 from matplotlib import pyplot as plt
 import matplotlib.backends.backend_pdf
 import plotly.graph_objects as go
@@ -14,7 +15,7 @@ import datetime as dt
 import seaborn as sns
 path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/Carnot'
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures'
-
+zeromean = True
 plot=True
 # Plotly layout
 layout = dict(font=dict(family='Computer Modern',size=11),
@@ -116,8 +117,10 @@ if plot:
 # Drop all columns with nan
 df = dfr.iloc[:,3:maxstep+3].to_numpy()
 mu = dfr.iloc[:,3:maxstep+3].mean(numeric_only=True)
+if zeromean:
+    mu[0:maxstep] = 0
 #cov = ShrunkCovariance(shrinkage=0.1).fit(df).covariance_
-#cov = np.cov(df, rowvar=False)
+cov = np.cov(df, rowvar=False)
 cov = dfr.iloc[:,3:maxstep+3].cov()
     # "the sample covariance matrix was singular which can happen from exactly collinearity (as you've said) or when the number of observations is less than the number of variables."
 
@@ -144,17 +147,17 @@ if plot:
     fig.update_layout(title='Covariance matrix of residuals per timestep', xaxis_title='Timestep', yaxis_title='Timestep')
     # Center title
     fig.update_layout(showlegend=False)
-    fig.write_html(pathhtml + "/Covariance_matrix_of_residuals_Carnot.html")
+    #fig.write_html(pathhtml + "/Covariance_matrix_of_residuals_Carnot.html")
     fig.show()
     fig.update_layout(layout)
-    fig.write_image(path + "/Covariance_matrix_of_residuals_Carnot.pdf")
+    #fig.write_image(path + "/Covariance_matrix_of_residuals_Carnot.pdf")
 
 
 # Generate 100 samples from the multivariate normal distribution
 samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 20000)
 print(samples.shape)
 # Export samples to csv
-np.savetxt("./data/MPC-ready/scenarios.csv", samples, delimiter=",")
+np.savetxt("./data/MPC-ready/scenarios_zeromean.csv", samples, delimiter=",")
 
 
 # Visualise the time series of the samples and add 95 % prediction interval

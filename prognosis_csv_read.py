@@ -348,11 +348,18 @@ dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv')
 
 # For each Atime plot the Predicted Price (dfp) and TruePrice (dft) throughout the horizon
 K_plots = len(dfp['Atime'].unique()) # 200
-minH = df['Atime'].value_counts().min()
+assert K_plots == len(dfp), 'K_plots should be equal to number of unique Atimes'
+#minH = df['Atime'].value_counts().min()
+minH = 145
 pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Carnot/PredictionMovie_Carnot.pdf")
 if plot: # Change to run=True for plotting
+    # Replace BigM with NaN
+    dfp = dfp.replace(BigM, np.nan)
+    dft = dft.replace(BigM*2, np.nan)
     for i, Atime in enumerate(dfp['Atime'][:K_plots]):
         fig = plt.figure(figsize=(6.3, 2.6))
+        dfp.iloc[i,3:(3+minH+1)] = dfp.iloc[i,3:(3+minH+1)].replace(BigM, np.nan)
+        dft.iloc[i,3:(3+minH+1)] = dft.iloc[i,3:(3+minH+1)].replace(BigM*2, np.nan)
         plt.plot(np.arange(0,minH+1), dfp.iloc[i,3:(3+minH+1)], label='Predicted')
         plt.plot(np.arange(0,minH+1), dft.iloc[i,3:(3+minH+1)], label='True', linestyle='--')
         plt.title('Spot Price Forecasts')
