@@ -263,7 +263,7 @@ def getMediods(scenarios, n_clusters):
     return(mediods, cluster_proportions)
 
 # Maintained here
-def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, verbose=False):
+def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, DayAhead=False, verbose=False):
 
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
@@ -293,6 +293,11 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             l = dfp['l_hours_avail'][i]-j
             if l < 12: # New prices are known at 13.00
                 l = 35
+
+            if DayAhead:
+                print("DAY AHEAD ONLY")
+                h = l-1
+                tvec = np.arange(0,h+1)
 
             # Extract forecasts from t=0..h
             c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy();

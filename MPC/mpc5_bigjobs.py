@@ -23,7 +23,7 @@ pd.set_option('display.max_rows', 500)
 
 # Choose
 runDeterministicReference = True
-NOTE = 'Perfect Foresight: Price + Use' # Optional message to output folder
+NOTE = 'Re-run (normal settings)' # Optional message to output folder
 
 # Metrics (with DumbCharge as baseline)
 RelativePerformance = lambda x, pf, dc:   (pf-x)/(pf-dc)
@@ -41,7 +41,6 @@ scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenari
 # Load pickle file from data/MPC-ready
 with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
-
 
 # Flip order of DFV list
 DFV = DFV[::-1]
@@ -71,7 +70,7 @@ for i in range(len(DFV)):
 
     for h in horizons:
         # Stochastic (without kMediods)
-        prob_stoch, x, b, flagFeasible_stoch = MultiDayStochastic(scenarios, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, perfectForesight=False, maxh=6*24, KMweights=None)
+        prob_stoch, x, b, flagFeasible_stoch = MultiDayStochastic(scenarios, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, perfectForesight=False, maxh=6*24, KMweights=None, DayAhead=False)
         results['stoch'+str(h)][i] = round(prob_stoch['objective'],2)
         infeasibles['stoch'+str(h)][i] = '  ' if flagFeasible_stoch else ' x '
         plot_EMPC(prob_stoch, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=True, firsthour=firsthour, vehicle_id=vehicle_id)

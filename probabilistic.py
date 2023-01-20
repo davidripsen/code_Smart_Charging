@@ -13,9 +13,10 @@ import plotly.express as px
 import pandas as pd
 import datetime as dt
 import seaborn as sns
+
 path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/Carnot'
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures'
-zeromean = True
+zeromean = False
 plot=True
 # Plotly layout
 layout = dict(font=dict(family='Computer Modern',size=11),
@@ -157,7 +158,7 @@ if plot:
 samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 20000)
 print(samples.shape)
 # Export samples to csv
-np.savetxt("./data/MPC-ready/scenarios_zeromean.csv", samples, delimiter=",")
+np.savetxt("./data/MPC-ready/scenarios.csv", samples, delimiter=",")
 
 
 # Visualise the time series of the samples and add 95 % prediction interval
@@ -185,3 +186,10 @@ if plot:
     fig.write_image(path + "/Samples_from_multivariate_normal_distribution_Carnot.pdf")
 
     # = Prediction interval (under correct model assumption)
+
+
+# Calculate autocorrelation and partial autocorrelation in dfr
+from statsmodels.graphics.tsaplots import plot_acf
+from statsmodels.graphics.tsaplots import plot_pacf
+plot_acf(dfr['t48'], lags=145).show()
+plot_pacf(dfr['t48'], lags=145).show()

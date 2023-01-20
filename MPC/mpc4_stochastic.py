@@ -323,7 +323,29 @@ fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxi
 fig.update_yaxes(range=[-3, 3])
 fig.show()
 
+# Visualise 10 random scenarios
+fig = go.Figure()
+j = np.random.randint(0, scenarios_all.shape[0]-n_clusters)
+for i in range(10):
+    fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[j+i,:], name='Scenario '+str(i)))
+fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
+fig.update_yaxes(range=[-3, 3])
+fig.show()
 
+
+for k in [0, 100, 200, 300, 400, 500, 600, 700, 800]:
+    n_clusters = 10
+    c_forecast = dfp.iloc[k, 3:3+145].to_numpy() + scenarios_all
+    c_forecasat = c_forecast[c_forecast<0] = 0
+    c_forecast
+
+    # Visualise n scenarios
+    fig = go.Figure()
+    for i in range(n_clusters):
+        fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=c_forecast[i], name='Scenario '+str(i)))
+    fig.update_layout(title=str(n_clusters) + ' Scenarios  at k='+str(k), xaxis_title='Time', yaxis_title='Price')
+    fig.update_yaxes(range=[-1, 6])
+    fig.show()
 
 
 
