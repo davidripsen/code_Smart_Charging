@@ -174,7 +174,9 @@ def StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin, xmax, c_forecas
     l: Length of deterministic prices
     O: Number of scenarios (Omega)
     """
-    scenarios = scenarios[0:n_scenarios, :] # for Dev: Antag n_scenarier scenarier
+    
+    i = np.random.randint(0, scenarios.shape[0]-n_scenarios)
+    scenarios = scenarios[i:i+n_scenarios, :] # Subset new scenarios every iteration
     #scenarios = scenarios_all
     if KMweights is None:
         KMweights = np.repeat(1/n_scenarios, n_scenarios)
