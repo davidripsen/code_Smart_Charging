@@ -168,11 +168,11 @@ if plot:
     # Add theoretical mean
     fig.add_trace(go.Scatter(x=mu.index, y=mu.values, mode='lines', name='Mean', line=dict(color='black', width=1)))
     # Add 95% confidence interval
-    fig.add_trace(go.Scatter(x=mu.index, y=mu.values+1.96*np.sqrt(np.diag(cov)), mode='lines', name='95% CI (Wald)', line=dict(width=1, color='red')))
+    fig.add_trace(go.Scatter(x=mu.index, y=mu.values+1.96*np.sqrt(np.diag(cov)), mode='lines', name='97.5% CI (Wald)', line=dict(width=1, color='red')))
     fig.add_trace(go.Scatter(x=mu.index, y=mu.values-1.96*np.sqrt(np.diag(cov)), mode='lines', name='2.5% CI (Wald)', line=dict(width=1, color='red')))
     # Calculate emperical 95 % quantiles from samples
     quantiles = np.quantile(samples, [0.025, 0.975], axis=0)
-    fig.add_trace(go.Scatter(x=mu.index, y=quantiles[0,:], mode='lines', name='95% quantile', line=dict(width=1, color='red', dash='dash')))
+    fig.add_trace(go.Scatter(x=mu.index, y=quantiles[0,:], mode='lines', name='97.5% quantile', line=dict(width=1, color='red', dash='dash')))
     fig.add_trace(go.Scatter(x=mu.index, y=quantiles[1,:], mode='lines', name='2.5% quantile', line=dict(width=1, color='red', dash='dash')))
     for i in range(0,100):
         fig.add_trace(go.Scatter
