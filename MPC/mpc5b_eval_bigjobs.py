@@ -11,10 +11,10 @@ sns.set_theme()
 pio.renderers.default = "browser"
 pd.set_option('display.max_rows', 200)
 
-folder = '13-01-2023__15h_51m_28s'
+folder = '19-01-2023__09h_25m_10s'
 D = pd.read_csv('results/'+folder+'/relativePerformances.csv')
 D = D[D != ' - ']
-D = D.dropna()
+#D = D.dropna()
 D = D.astype(float)
 Dres = pd.read_csv('results/'+folder+'/results.csv')
 Dres = Dres[Dres != ' - ']

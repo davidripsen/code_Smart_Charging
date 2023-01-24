@@ -36,27 +36,23 @@ for i in range(len(DFV)):
         print(i)
         
 
-    #################################################### LET'S GO! ########################################################
+    #################################################### LET'S GO! ###################################################m#####
 
 
     # Note: Scenarios as is right now, do not take into account that the uncertainty/scenarios differences are very dependent of time of day.
-    def StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z, tvec, r, l, previous_solution=None, KMweights=None, verbose=True):
+    def StochasticProgram(n_scenarios, b0, bmax, bmin, xmax, c_d, c_s, c_tilde, u_t_true, u_forecast, z, tvec, r, l, previous_solution=None, KMweights=None, verbose=True):
         """
         Solves the 2-stage stochastic program for a given time horizon T, and returns the optimal solution.
         l: Length of deterministic prices
         O: Number of scenarios (Omega)
         """
-        scenarios = scenarios[0:n_scenarios, :] # for Dev: Antag n_scenarier scenarier
-        #scenarios = scenarios_all
+
         if KMweights is None:
             KMweights = np.repeat(1/n_scenarios, n_scenarios)
-        O, K = scenarios.shape
+        O, K = c_s.shape
         tvec_d = tvec[0:l] # Deterministic part
         tvec_s = tvec[l:]  # Stochastic part
-        c_d = c_forecast[:l] # Deterministic part
-        c_s = c_forecast + scenarios[:, :(h+1)] # Stochastic part
-        c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negative electricity spot prices
-
+        
         ### Init problem
         prob = LpProblem("StochEcoMPC", LpMinimize)
 
@@ -115,7 +111,7 @@ for i in range(len(DFV)):
             b[(1,o)] = b[(0,o)] + value(x_d[0])*r - u_t_true
             prob.assignVarsVals({'b_(1,_'+str(o)+')': b[1,o]})
             assert b[1,o] == value(b[1,0]), "b(1,o) is not equal to value(b(1,0))"
-            # ^ Most of this code is redundant
+            # ^ Most of this loop code is redundant
 
         # Return results
         return(prob, x_d, b, x_s)
@@ -155,18 +151,13 @@ for i in range(len(DFV)):
         return(mediods, cluster_proportions)
 
 
-    def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, verbose=False):
-        # maxh = 6*24 # Delete
-        # h = 4*24 # Delete
-        # scenarios = mediods # Delete
-        # KMweights = KMweights # Delete
-        # n_scenarios = len(KMweights) # Delete
-        # perfectForesight=False
-
+    def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, DayAhead=False, verbose=False):
+    
         # Study from first hour of prediciton up to and including the latest hour of known spot price
         L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
-        # perfectForesight = False # Deleter
-        
+        H = h; # Store h
+        # perfectForesight = False
+
         # Init
         flag_AllFeasible = True
         prev_sol = None
@@ -180,6 +171,8 @@ for i in range(len(DFV)):
         
         # For each Atime
         for i in range(len(dfp)):
+            h = H
+            tvec = np.arange(0,h+1)
             # For each hour until next forecast
             for j in range(dfp['Atime_diff'][i]):
                 if k%50 == 1: print("k = " + str(k) + " of " + str(L-1))
@@ -189,13 +182,32 @@ for i in range(len(DFV)):
                 if l < 12: # New prices are known at 13.00
                     l = 35
 
+                if DayAhead:
+                    print("DAY AHEAD ONLY")
+                    h = l-1
+                    tvec = np.arange(0,h+1)
+
+                # When re-using the same forecast, shorten the horizon
+                if (j>0) and (not DayAhead):
+                    h = max(h-1, l-1) # h = h-1 but don't go below the DayAhead horizon
+                    #print('k = ' + str(k) + ', h = ' + str(h) + ', l = ' + str(l) + ', j = ' + str(j) + ', i = ' + str(i) + ', Atime_diff = ' + str(dfp['Atime_diff'][i]))
+                    # h = min(h, L-k) # next implement
+                    tvec = np.arange(0,h+1)
+
                 # Extract forecasts from t=0..h
-                c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy();
+                c_forecast = dfp.iloc[i, (j+3):(3+H+1)].to_numpy();
                 if perfectForesight:
-                    c_forecast = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy();
+                    c_forecast = dft.iloc[i, (j+3):(3+H+1)].to_numpy();
                 
                 # Patch holes in forecasts (2 out of 2) - use known prices
-                c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()[:min(l,h+1)]
+                c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(3+H+1)].to_numpy()[:min(l,h+1)]
+
+                # Extract deterministic and stochastic prices
+                idx = np.random.randint(0, scenarios.shape[0]-n_scenarios)
+                scenarioExtract = scenarios[idx:idx+n_scenarios, :] # Subset new scenarios every iteration
+                c_d = c_forecast[:l] # Deterministic part
+                c_s = c_forecast + scenarioExtract[:, j:(H+1)] # Stochastic part
+                c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negative electricity spot prices
 
                 # Find relevant input at the specific hours of flexibility
                 tvec_i = np.arange(k, k+h+1)
@@ -208,8 +220,8 @@ for i in range(len(DFV)):
                 u_t_true = u[k]
 
                 # Solve
-                if z_i[0] != 0:
-                    prob, x_d, b, x_s = StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, tvec, r, l, previous_solution=None, KMweights=KMweights, verbose=verbose)
+                if z_i[0] != 0: # Plugged in
+                    prob, x_d, b, x_s = StochasticProgram(n_scenarios, b0, bmax, bmin_i, xmax, c_d, c_s, c_tilde, u_t_true, u_forecast, z_i, tvec, r, l, previous_solution=None, KMweights=KMweights, verbose=verbose)
                     if LpStatus[prob.status] != 'Optimal':
                         flag_AllFeasible = False
                         print("\n\nPlugged in = ", z[k],"=", z_i[0])
@@ -222,7 +234,6 @@ for i in range(len(DFV)):
                     x0 = value(x_d[0])
                     b1 = value(b[1,0])
                 elif z_i[0] == 0: # Not plugged in
-                    print('Saving one iter')
                     x0 = 0
                     b1 = b0 + x0*r - u_t_true
 
@@ -246,8 +257,8 @@ for i in range(len(DFV)):
     ### Run the problem
     h = 4*24 # 5 days horizon for the multi-day smart charge
     n_scenarios = 10
-    #prob, x, b, flagFeasible = MultiDayStochastic(scenarios_all, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh = 6*24)
-    #plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+    prob, x, b, flagFeasible = MultiDayStochastic(scenarios_all, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh = 6*24)
+    plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
     # ### Run the problem on mediods
     n_clusters=10
@@ -319,7 +330,7 @@ fig.show()
 fig = go.Figure()
 for i in range(50):
     fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)))
-fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
+fig.update_layout(title=str(50) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
 fig.update_yaxes(range=[-3, 3])
 fig.show()
 
