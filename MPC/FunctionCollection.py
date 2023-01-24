@@ -378,6 +378,7 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
     # For each Atime
     for i in range(len(dfp)):
         h = H
+        tvec = np.arange(0,h+1)
         # For each hour until next forecast
         for j in range(dfp['Atime_diff'][i]):
             if k%50 == 0:
