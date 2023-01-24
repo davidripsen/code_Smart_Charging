@@ -267,7 +267,8 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
 
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
-    # perfectForesight = False # Deleter
+    H = h; # Store h
+    # perfectForesight = False
 
     #L = 200 # Delete
 
@@ -285,6 +286,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
     
     # For each Atime
     for i in range(len(dfp)):
+        h = H
         # For each hour until next forecast
         for j in range(dfp['Atime_diff'][i]):
             if k%50 == 1: print("k = " + str(k) + " of " + str(L-1))
@@ -299,13 +301,20 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
                 h = l-1
                 tvec = np.arange(0,h+1)
 
-            # Extract forecasts from t=0..h
-            c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy();
-            if perfectForesight:
-                c_forecast = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy();
-            
-            # Patch holes in forecasts (2 out of 2) - use known prices
-            c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()[:min(l,h+1)]
+            # When re-using the same forecast, shorten the horizon
+            if (j>0) and (not DayAhead):
+                h = max(h-1, l-1) # h = h-1 but don't go below the DayAhead horizon
+                c_forecast = c_forecast[1:]
+                tvec = np.arange(0,h+1)
+
+            else:
+                # Extract forecasts from t=0..h
+                c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy();
+                if perfectForesight:
+                    c_forecast = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy();
+                
+                # Patch holes in forecasts (2 out of 2) - use known prices
+                c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()[:min(l,h+1)]
 
             # Find relevant input at the specific hours of flexibility
             tvec_i = np.arange(k, k+h+1)
@@ -318,7 +327,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             u_t_true = u[k]
 
             # Solve
-            if z_i[0] != 0:
+            if z_i[0] != 0: # Plugged in
                 prob, x_d, b, x_s = StochasticProgram(scenarios, n_scenarios, h, b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, tvec, r, l, previous_solution=None, KMweights=KMweights, verbose=verbose)
                 if LpStatus[prob.status] != 'Optimal':
                     flag_AllFeasible = False
@@ -383,14 +392,21 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
                 h = l-1
                 tvec = np.arange(0,h+1)
 
-            # Extract forecasts from t=0..h
-            c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy()
-            if perfectForesight:
-                c_forecast = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()
-            
-            # Patch holes in forecasts (2 out of 2) - use known prices
-            c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()[:min(l,h+1)]
+            # When re-using the same forecast, shorten the horizon
+            if (j>0) and (not DayAhead):
+                h = max(h-1, l-1) # h = h-1 but don't go below the DayAhead horizon
+                c_forecast = c_forecast[1:]
+                tvec = np.arange(0,h+1)
 
+            else:
+                # Extract forecasts from t=0..h
+                c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy();
+                if perfectForesight:
+                    c_forecast = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy();
+                
+                # Patch holes in forecasts (2 out of 2) - use known prices
+                c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(j+3+h+1)].to_numpy()[:min(l,h+1)]
+            
             # Find relevant input at the specific hours of flexibility
             tvec_i = np.arange(k, k+h+1)
             z_i = z[tvec_i] # Assuming known plug-in times.
