@@ -24,7 +24,7 @@ np.random.seed(2812)
 
 # Choose
 runDeterministicReference = True
-NOTE = 'Zero-mean scenarios' # Optional message to output folder
+NOTE = 'Punish scenarios less for using s and s2, i.e. 100*O*ctilde --> O*ctilde' # Optional message to output folder
 print(NOTE)
 
 # Metrics (with DumbCharge as baseline)

@@ -206,7 +206,7 @@ def StochasticProgram(n_scenarios, b0, bmax, bmin, xmax, c_d, c_s, c_tilde, u_t_
     #                 x_s[t-1,o].setInitialValue(round(x_s_prev[(t,o)].value(), 5))
 
     ### Objective
-    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([KMweights[o] * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([KMweights[o] * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)]) + lpSum([KMweights[o] * 100*O*c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)])
+    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([KMweights[o] * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([KMweights[o] * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)]) + lpSum([KMweights[o] * O *c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)])
 
     ### Constraints
         # Deterministic part
