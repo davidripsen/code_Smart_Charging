@@ -23,7 +23,7 @@ pd.set_option('display.max_rows', 500)
 
 # Choose
 runDeterministicReference = True
-NOTE = 'Normal go (fixed bugs!) - with new imlpementation: Shorten horizon when re-using forecast' # Optional message to output folder
+NOTE = '+ End-of-experiment-adjusted horizon' # Optional message to output folder
 
 # Metrics (with DumbCharge as baseline)
 RelativePerformance = lambda x, pf, dc:   (pf-x)/(pf-dc)

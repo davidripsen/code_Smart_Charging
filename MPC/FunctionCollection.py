@@ -292,8 +292,8 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             # When re-using the same forecast, shorten the horizon
             if j>0:
                 h = max(h-1, l-1) # h = h-1 but don't go below the DayAhead horizon
-                # h = min(h, L-k) # next implement
-                tvec = np.arange(0,h+1)
+            h = min(h, L-k) # Allow control to now that experiment is ending.
+            tvec = np.arange(0,h+1)
             #print("i,j,k,l,h = ", i,j,k,l,h)
 
             # Extract forecasts from t=0..h
@@ -392,13 +392,13 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
                 h = l-1
                 #H = dfp['l_hours_avail'][i]-1
                 H = dfp['l_hours_avail'][i]-1 + 24*flagForecastHole
-                tvec = np.arange(0,h+1)
                 #print("i,j,k,l,h = ", i,j,k,l,h)
 
             # When re-using the same forecast, shorten the horizon
             if (j>0) and (not DayAhead):
                 h = max(h-1, l-1) # h = h-1 but don't go below the DayAhead horizon
-                tvec = np.arange(0,h+1)
+            h = min(h, L-k) # Allow control to now that experiment is ending.
+            tvec = np.arange(0,h+1)
 
             # Extract forecasts from t=0..h
             #c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy()
