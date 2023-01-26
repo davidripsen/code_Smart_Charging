@@ -78,7 +78,7 @@ for i in range(len(DFV)):
         #                 x_s[t-1,o].setInitialValue(round(x_s_prev[(t,o)].value(), 5))
 
         ### Objective
-        prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([KMweights[o] * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([KMweights[o] * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)]) + lpSum([KMweights[o] * O *c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)])
+        prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([KMweights[o] * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([KMweights[o] * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)]) + lpSum([KMweights[o] * 100 *c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)])
 
         ### Constraints
             # Deterministic part
@@ -152,6 +152,7 @@ for i in range(len(DFV)):
 
 
     def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, verbose=False):
+        
         # Study from first hour of prediciton up to and including the latest hour of known spot price
         L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
         H = h; # Store h
@@ -198,8 +199,11 @@ for i in range(len(DFV)):
                 c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(3+H+1)].to_numpy()[:min(l,h+1)]
 
                 # Extract deterministic and stochastic prices
-                idx = np.random.randint(0, scenarios.shape[0]-n_scenarios)
-                scenarioExtract = scenarios[idx:idx+n_scenarios, :] # Subset new scenarios every iteration
+                if KMweights is None:
+                    idx = np.random.randint(0, scenarios.shape[0]-n_scenarios)
+                    scenarioExtract = scenarios[idx:idx+n_scenarios, :] # Subset new scenarios every iteration
+                else:
+                    scenarioExtract = scenarios
                 c_d = c_forecast[:l] # Deterministic part
                 c_s = c_forecast + scenarioExtract[:, j:(H+1)] # Stochastic part
                 c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negative electricity spot prices. Conclussion: Performed better.
@@ -283,8 +287,8 @@ for i in range(len(DFV)):
         bmin_within = bmin[0:T_within+2]
 
         # ## Day-Ahead SmartCharge
-        # prob_da, x, b, flag_AllFeasible_da = MultiDay(dfp, dft, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=True, maxh=6*24, perfectForesight=False)
-        # plot_EMPC(prob_da, 'Day-Ahead Smart Charge of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour)
+        prob_da, x, b, flag_AllFeasible_da = MultiDay(dfp, dft, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=True, maxh=6*24, perfectForesight=False)
+        plot_EMPC(prob_da, 'Day-Ahead Smart Charge of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour)
 
 
         ### Perfect Foresight

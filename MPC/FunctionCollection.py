@@ -308,6 +308,8 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             if KMweights is None:
                 idx = np.random.randint(0, scenarios.shape[0]-n_scenarios)
                 scenarioExtract = scenarios[idx:idx+n_scenarios, :] # Subset new scenarios every iteration
+            else:
+                scenarioExtract = scenarios
             c_d = c_forecast[:l] # Deterministic part
             c_s = c_forecast + scenarioExtract[:, j:(H+1)] # Stochastic part
             c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negative electricity spot prices. Conclussion: Performed better.
@@ -352,6 +354,10 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             if k == L:
                 # Costs
                 total_cost = np.sum(costs) - c_tilde * (B[-1] - B[0])
+
+                # Any non-feasibilities
+                if any(B<0) or any(B > 1.25*bmax):
+                    flag_AllFeasible = False
 
                 # Tie results intro prob
                 prob = {'x':X, 'b':B, 'u':u[0:L], 'c':c[0:L], 'z':z[0:L], 'objective':total_cost}
@@ -451,6 +457,10 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
             if k == L:
                 # Costs
                 total_cost = np.sum(costs) - c_tilde * (B[-1] - B[0])
+
+                # Any non-feasibilities
+                if any(B<0) or any(B > 1.25*bmax):
+                    flag_AllFeasible = False
 
                 # Tie results intro prob
                 prob = {'x':X, 'b':B, 'u':u[0:L], 'c':c[0:L], 'z':z[0:L], 'objective':total_cost}
