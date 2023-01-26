@@ -23,7 +23,7 @@ pd.set_option('display.max_rows', 500)
 
 # Choose
 runDeterministicReference = True
-NOTE = '+ End-of-experiment-adjusted horizon' # Optional message to output folder
+NOTE = '+ Dont truncate cost: c_s < 0' # Optional message to output folder
 
 # Metrics (with DumbCharge as baseline)
 RelativePerformance = lambda x, pf, dc:   (pf-x)/(pf-dc)

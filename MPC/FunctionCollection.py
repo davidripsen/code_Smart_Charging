@@ -309,7 +309,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             scenarioExtract = scenarios[idx:idx+n_scenarios, :] # Subset new scenarios every iteration
             c_d = c_forecast[:l] # Deterministic part
             c_s = c_forecast + scenarioExtract[:, j:(H+1)] # Stochastic part
-            c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negative electricity spot prices
+            #c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negative electricity spot prices
 
             # Find relevant input at the specific hours of flexibility
             tvec_i = np.arange(k, k+h+1)
