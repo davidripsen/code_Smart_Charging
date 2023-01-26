@@ -34,14 +34,14 @@ AbsolutePerformance = lambda x, dc:       dc-x
 # Models
 models_h = ['stochKM', 'stoch', 'mda']
 models_plain = ['da', 'pf', 'dc']
-horizons = [4, 6]
+horizons = [3, 4, 5, 6]
 models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for h in horizons]
 
 # n_clusters  (= n_scenarios)
 n_clusters=20
 
 # Read scenarios from txt
-scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenarios_all=scenarios;
+scenarios = np.loadtxt('./data/MPC-ready/scenarios_zeromean.csv', delimiter=','); scenarios_all=scenarios;
 
 # Load pickle file from data/MPC-ready
 with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
@@ -76,12 +76,12 @@ for i in range(len(DFV)):
         infeasibles['stoch'+str(h)][i] = '  ' if flagFeasible_stoch else ' x '
         plot_EMPC(prob_stoch, 'Stochastic Multi-Day Smart Charge (h = '+str(h)+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=True, firsthour=firsthour, vehicle_id=vehicle_id)
 
-        # Stochastic with kMediods
-        mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
-        prob_stochKM, x, b, flagFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, KMweights=weights)
-        results['stochKM'+str(h)][i] = round(prob_stochKM['objective'],2)
-        infeasibles['stochKM'+str(h)][i] = '  ' if flagFeasible_stochKM else ' x '
-        plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(h)+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
+        # # Stochastic with kMediods
+        # mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
+        # prob_stochKM, x, b, flagFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, KMweights=weights)
+        # results['stochKM'+str(h)][i] = round(prob_stochKM['objective'],2)
+        # infeasibles['stochKM'+str(h)][i] = '  ' if flagFeasible_stochKM else ' x '
+        # plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(h)+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
 
         if runDeterministicReference:
             ### Multi-Dayahead (Deterministic)
