@@ -206,7 +206,7 @@ def StochasticProgram(n_scenarios, b0, bmax, bmin, xmax, c_d, c_s, c_tilde, u_t_
     #                 x_s[t-1,o].setInitialValue(round(x_s_prev[(t,o)].value(), 5))
 
     ### Objective
-    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([KMweights[o] * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([KMweights[o] * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)]) + lpSum([KMweights[o] * O *c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)])
+    prob += lpSum([c_d[t]*x_d[t] for t in tvec_d]) + lpSum([KMweights[o] * c_s[o,t]*x_s[t,o] for t in tvec_s for o in range(O)]) - lpSum([KMweights[o] * c_tilde * ((b[tvec[-1],o]) - b[0,o]) for o in range(O)]) + lpSum([KMweights[o] * 100 *c_tilde*(s[t,o]+s2[t+1,o]) for t in tvec for o in range(O)])
 
     ### Constraints
         # Deterministic part
@@ -305,8 +305,9 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(3+H+1)].to_numpy()[:min(l,h+1)]
 
             # Extract deterministic and stochastic prices
-            idx = np.random.randint(0, scenarios.shape[0]-n_scenarios)
-            scenarioExtract = scenarios[idx:idx+n_scenarios, :] # Subset new scenarios every iteration
+            if KMweights is None:
+                idx = np.random.randint(0, scenarios.shape[0]-n_scenarios)
+                scenarioExtract = scenarios[idx:idx+n_scenarios, :] # Subset new scenarios every iteration
             c_d = c_forecast[:l] # Deterministic part
             c_s = c_forecast + scenarioExtract[:, j:(H+1)] # Stochastic part
             c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negative electricity spot prices. Conclussion: Performed better.
