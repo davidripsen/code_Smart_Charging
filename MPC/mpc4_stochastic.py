@@ -25,7 +25,7 @@ with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
 
 # Ids of interest
-idsOfInterest = [1601, 30299, 6817, 18908] # Ids where perfect foresight fails
+idsOfInterest = [25701] #[1601, 30299, 6817, 18908] # Ids where perfect foresight fails
 for i in range(len(DFV)):
     # i=2 Good performance (from stochastic model), i=3: Shitty performance
     dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
@@ -269,10 +269,10 @@ for i in range(len(DFV)):
 
     if runDeterministicReference:
         ### Multi-Dayahead (Deterministic)
-        h = 4*24 # 5 days horizon for the multi-day smart charge
-        # prob_mda, x, b, flagFeasible_mda = MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=False)
-        # #prob, x, b = MultiDay(dft, dfspot, u, uhat, z, 6*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24) # Snyd: kendte priser
-        # plot_EMPC(prob_mda, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+        h = 6*24 # 5 days horizon for the multi-day smart charge
+        prob_mda, x, b, flagFeasible_mda = MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=False)
+        #prob, x, b = MultiDay(dft, dfspot, u, uhat, z, 6*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24) # Snyd: kendte priser
+        plot_EMPC(prob_mda, 'Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
         # Compare models on the data within horizon
         maxh = 6*24
