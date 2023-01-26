@@ -20,10 +20,12 @@ now = datetime.now()
 nowstring = now.strftime("%d-%m-%Y__%Hh_%Mm_%Ss")
 os.mkdir('results/'+nowstring)
 pd.set_option('display.max_rows', 500)
+np.random.seed(2812)
 
 # Choose
 runDeterministicReference = True
-NOTE = '+ Dont truncate cost: c_s < 0' # Optional message to output folder
+NOTE = 'Zero-mean scenarios' # Optional message to output folder
+print(NOTE)
 
 # Metrics (with DumbCharge as baseline)
 RelativePerformance = lambda x, pf, dc:   (pf-x)/(pf-dc)
@@ -39,7 +41,7 @@ models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for 
 n_clusters=10
 
 # Read scenarios from txt
-scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenarios_all=scenarios;
+scenarios = np.loadtxt('./data/MPC-ready/scenarios_zeromean.csv', delimiter=','); scenarios_all=scenarios;
 
 # Load pickle file from data/MPC-ready
 with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
@@ -75,13 +77,11 @@ for i in range(len(DFV)):
         plot_EMPC(prob_stoch, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=True, firsthour=firsthour, vehicle_id=vehicle_id)
 
         # Stochastic with kMediods
-        #h = 4*24 # 5 days horizon for the multi-day smart charge
         # mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
         # prob_stochKM, x, b, flagFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, KMweights=weights)
         # results['stochKM'+str(h)][i] = round(prob_stochKM['objective'],2)
         # infeasibles['stochKM'+str(h)][i] = '  ' if flagFeasible_stochKM else ' x '
         # plot_EMPC(prob_stochKM, 'Stochastic Multi-Day (+kMediods) Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
-        #### Evt missing: Implement warmstart
 
         if runDeterministicReference:
             ### Multi-Dayahead (Deterministic)

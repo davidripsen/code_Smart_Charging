@@ -193,3 +193,40 @@ from statsmodels.graphics.tsaplots import plot_acf
 from statsmodels.graphics.tsaplots import plot_pacf
 plot_acf(dfr['t48'], lags=145).show()
 plot_pacf(dfr['t48'], lags=145).show()
+    # There is ofc autocorrelation, that is what we are modelling with the covariance matrix
+
+
+######################################################################################################################################
+#################################################### FURTHER RESIDUAL ANALYSIS #######################################################
+######################################################################################################################################
+# Set seed
+np.random.seed(2812)
+
+fig = px.line(dfr, x='Atime', y='t48', title="Residuals at timestep 48")
+fig.show()
+
+for t in [24, 48, 72, 96, 120, 144]:
+    # Make boxplots of residuals at t48 for each hour of the day as extracted from Atime
+    dfr['hour'] = dfr['Atime'].dt.hour
+    fig = px.box(dfr, x='hour', y='t'+str(t), title="Boxplots of residuals at timestep "+str(t) + " for each hour of the day")
+    fig.update_yaxes(title_text="Residuals", range=[-4, 4])
+    fig.show()
+
+
+scenarios_all = samples
+for k in [0, 100, 200, 300, 400, 500, 600, 700, 800]:
+    n_clusters = 10
+    c_forecast = dfp.iloc[k, 3:3+145].to_numpy()
+    c_true = dft.iloc[k, 3:3+145].to_numpy()
+    c_s = dfp.iloc[k, 3:3+145].to_numpy() + scenarios_all
+    c_s[c_s<0] = 0
+
+    # Visualise n scenarios
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=np.arange(len(c_forecast)), y=c_forecast, name='Forecast'))
+    fig.add_trace(go.Scatter(x=np.arange(len(c_true)), y=c_true, name='True'))
+    for i in range(n_clusters):
+        fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=c_s[i], name='Scenario '+str(i)))
+    fig.update_layout(title=str(n_clusters) + ' Scenarios  at k='+str(k), xaxis_title='Time', yaxis_title='Price')
+    fig.update_yaxes(range=[-1, 6])
+    fig.show()

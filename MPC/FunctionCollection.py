@@ -292,7 +292,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             # When re-using the same forecast, shorten the horizon
             if j>0:
                 h = max(h-1, l-1) # h = h-1 but don't go below the DayAhead horizon
-            h = min(h, L-k) # Allow control to now that experiment is ending.
+            h = min(h, L-k) # Allow control to know that experiment is ending.
             tvec = np.arange(0,h+1)
             #print("i,j,k,l,h = ", i,j,k,l,h)
 
@@ -309,7 +309,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             scenarioExtract = scenarios[idx:idx+n_scenarios, :] # Subset new scenarios every iteration
             c_d = c_forecast[:l] # Deterministic part
             c_s = c_forecast + scenarioExtract[:, j:(H+1)] # Stochastic part
-            #c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negative electricity spot prices
+            c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negative electricity spot prices. Conclussion: Performed better.
 
             # Find relevant input at the specific hours of flexibility
             tvec_i = np.arange(k, k+h+1)
@@ -397,7 +397,7 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
             # When re-using the same forecast, shorten the horizon
             if (j>0) and (not DayAhead):
                 h = max(h-1, l-1) # h = h-1 but don't go below the DayAhead horizon
-            h = min(h, L-k) # Allow control to now that experiment is ending.
+            h = min(h, L-k) # Allow control to know that experiment is ending.
             tvec = np.arange(0,h+1)
 
             # Extract forecasts from t=0..h
