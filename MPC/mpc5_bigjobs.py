@@ -23,7 +23,7 @@ pd.set_option('display.max_rows', 500)
 
 # Choose
 runDeterministicReference = True
-NOTE = 'Normal go - with new imlpementation: Shorten horizon when re-using forecast' # Optional message to output folder
+NOTE = 'Normal go (fixed bugs!) - with new imlpementation: Shorten horizon when re-using forecast' # Optional message to output folder
 
 # Metrics (with DumbCharge as baseline)
 RelativePerformance = lambda x, pf, dc:   (pf-x)/(pf-dc)
@@ -34,6 +34,9 @@ models_h = ['stochKM', 'stoch', 'mda']
 models_plain = ['da', 'pf', 'dc']
 horizons = [6]
 models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for h in horizons]
+
+# n_clusters  (= n_scenarios)
+n_clusters=10
 
 # Read scenarios from txt
 scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenarios_all=scenarios;
@@ -64,19 +67,16 @@ for i in range(len(DFV)):
  
     #################################################### LET'S GO! ########################################################
 
-    #### Run the problem on mediods
-    n_clusters=10
-    mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
-
     for h in horizons:
         # Stochastic (without kMediods)
-        prob_stoch, x, b, flagFeasible_stoch = MultiDayStochastic(scenarios, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, perfectForesight=False, maxh=6*24, KMweights=None, DayAhead=False)
+        prob_stoch, x, b, flagFeasible_stoch = MultiDayStochastic(scenarios, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, perfectForesight=False, maxh=6*24, KMweights=None)
         results['stoch'+str(h)][i] = round(prob_stoch['objective'],2)
         infeasibles['stoch'+str(h)][i] = '  ' if flagFeasible_stoch else ' x '
         plot_EMPC(prob_stoch, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=True, firsthour=firsthour, vehicle_id=vehicle_id)
 
         # Stochastic with kMediods
         #h = 4*24 # 5 days horizon for the multi-day smart charge
+        # mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
         # prob_stochKM, x, b, flagFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, KMweights=weights)
         # results['stochKM'+str(h)][i] = round(prob_stochKM['objective'],2)
         # infeasibles['stochKM'+str(h)][i] = '  ' if flagFeasible_stochKM else ' x '

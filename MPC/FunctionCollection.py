@@ -257,7 +257,7 @@ def getMediods(scenarios, n_clusters):
     return(mediods, cluster_proportions)
 
 # Maintained here
-def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, DayAhead=False, verbose=False):
+def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, verbose=False):
     
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
@@ -278,27 +278,23 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
     # For each Atime
     for i in range(len(dfp)):
         h = H
-        tvec = np.arange(0,h+1)
+        l = dfp['l_hours_avail'][i]+1
         # For each hour until next forecast
         for j in range(dfp['Atime_diff'][i]):
-            if k%50 == 1: print("k = " + str(k) + " of " + str(L-1))
-
+            if k%50 == 0:
+                print("k = " + str(k) + " of " + str(L-1))
+            
             # Patch holes in forecasts (1 out of 2)
-            l = dfp['l_hours_avail'][i]-j
+            l = l-1
             if l < 12: # New prices are known at 13.00
                 l = 35
 
-            if DayAhead:
-                print("DAY AHEAD ONLY")
-                h = l-1
-                tvec = np.arange(0,h+1)
-
             # When re-using the same forecast, shorten the horizon
-            if (j>0) and (not DayAhead):
+            if j>0:
                 h = max(h-1, l-1) # h = h-1 but don't go below the DayAhead horizon
-                #print('k = ' + str(k) + ', h = ' + str(h) + ', l = ' + str(l) + ', j = ' + str(j) + ', i = ' + str(i) + ', Atime_diff = ' + str(dfp['Atime_diff'][i]))
                 # h = min(h, L-k) # next implement
                 tvec = np.arange(0,h+1)
+            #print("i,j,k,l,h = ", i,j,k,l,h)
 
             # Extract forecasts from t=0..h
             c_forecast = dfp.iloc[i, (j+3):(3+H+1)].to_numpy();
@@ -360,7 +356,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
                 prob = {'x':X, 'b':B, 'u':u[0:L], 'c':c[0:L], 'z':z[0:L], 'objective':total_cost}
                 return(prob, X, B, flag_AllFeasible)
 
-# Maintained in here (from mpc3_montadata.py)
+# Maintained here (from mpc3_montadata.py)
 def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=False, maxh=6*24, perfectForesight=False):
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
@@ -379,19 +375,25 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
     for i in range(len(dfp)):
         h = H
         tvec = np.arange(0,h+1)
+        flagForecastHole = 0
+        l = dfp['l_hours_avail'][i]+1
         # For each hour until next forecast
         for j in range(dfp['Atime_diff'][i]):
             if k%50 == 0:
                 print("k = " + str(k) + " of " + str(L-1))
             
             # Patch holes in forecasts (1 out of 2)
-            l = dfp['l_hours_avail'][i]-j
+            l = l-1
             if l < 12: # New prices are known at 13.00
                 l = 35
+                flagForecastHole += 1
 
             if DayAhead:  # If Day-Ahead Smart Charge, disregard h input and use h = l_hours_avail-1
                 h = l-1
+                #H = dfp['l_hours_avail'][i]-1
+                H = dfp['l_hours_avail'][i]-1 + 24*flagForecastHole
                 tvec = np.arange(0,h+1)
+                #print("i,j,k,l,h = ", i,j,k,l,h)
 
             # When re-using the same forecast, shorten the horizon
             if (j>0) and (not DayAhead):
