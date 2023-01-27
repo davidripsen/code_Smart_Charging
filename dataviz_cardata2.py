@@ -13,12 +13,7 @@ pd.set_option('display.max_rows', 500)
 layout = dict(font=dict(family='Computer Modern',size=11),
               margin=dict(l=5, r=5, t=30, b=5),
               width=605, height= 250, title_x = 0.5,
-            #   legend=dict(orientation="h",
-            #                 yanchor="bottom",
-            #                 y=-.8,
-            #                 xanchor="right",
-            #                 x=0.2)
-            )
+              legend=dict(orientation="h", yanchor="bottom", y=-.22, xanchor="right", x=1))
 path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/EV_Monta/Individual_EVs/'
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 

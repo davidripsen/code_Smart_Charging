@@ -12,6 +12,12 @@ import plotly.graph_objects as go
 import json
 import datetime
 pd.set_option('display.max_rows', 500)
+layout = dict(font=dict(family='Computer Modern',size=11),
+              margin=dict(l=5, r=5, t=30, b=5),
+              width=605, height= 250, title_x = 0.5)
+path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/EV_Monta/Individual_EVs/'
+pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
+
 
 # # Read EV user data
 # df = pd.read_csv('data/Monta/2022_11_03 10_15.csv', sep=',', header=0, parse_dates=True) # All charges
@@ -124,7 +130,7 @@ plot_hourly_plugtimes(df, 'RELEASED_AT', "Daily pattern of RELEASED_AT", "Hour o
 
 # Plot weekly pattern of plug-in and plug-out times
 def plot_weekly_plugtimes(df, var, title, xlab, ylab):
-    fig = go.Figure(data=[go.Histogram(x=df[var].dt.weekday)])
+    fig = go.Figure(data=[go.Histogram(x=df[var].dt.weekday)]) 
     fig.update_layout(
         title_text=title, # title of plot
         xaxis_title_text=xlab, # xaxis label
@@ -141,7 +147,7 @@ plot_weekly_plugtimes(df, 'RELEASED_AT', "Weekly pattern of RELEASED_AT", "Day o
 
 # Plot diurnal-weekly pattern of plug-in and plug-out times
 def plot_diurnal_weekly_plugtimes(df, var, title, xlab, ylab, export=False):
-    fig = go.Figure(data=[go.Histogram2d(y=df[var].dt.hour, x=df[var].dt.weekday)])
+    fig = go.Figure(data=[go.Histogram2d(y=df[var].dt.hour, x=df[var].dt.weekday)]) 
     fig.update_layout(
         title_text=title, # title of plot
         xaxis_title_text=xlab, # xaxis label
@@ -156,7 +162,8 @@ def plot_diurnal_weekly_plugtimes(df, var, title, xlab, ylab, export=False):
     # Export figure
     if export:
         fig.write_html( "plots/EV_Monta/diurnal_weekly_" + var + ".html")
-        fig.write_image("plots/EV_Monta/diurnal_weekly_" + var + ".pdf", scale=2)
+        fig.update_layout(layout)
+        fig.write_image("plots/EV_Monta/diurnal_weekly_" + var + ".pdf")
 
 plot_diurnal_weekly_plugtimes(df, 'CABLE_PLUGGED_IN_AT', "Daily-weekly pattern of CABLE_PLUGGED_IN_AT by SmartCharge users", "Day of week", "Hour of day", export=True)
 plot_diurnal_weekly_plugtimes(df, 'PLANNED_PICKUP_AT', "Daily-weekly pattern of PLANNED_PICKUP_AT by SmartCharge users", "Day of week", "Hour of day", export=True)

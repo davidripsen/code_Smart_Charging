@@ -322,6 +322,9 @@ fig.update(layout)
 fig.write_image(path+"Efficiencies.pdf")
 fig.show()
 
+# Calculate quantiles of Rs
+np.quantile(R, [0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99])
+
 
 # Visualise mediods
 fig = go.Figure()
