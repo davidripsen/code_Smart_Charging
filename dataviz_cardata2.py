@@ -12,7 +12,13 @@ import pickle
 pd.set_option('display.max_rows', 500)
 layout = dict(font=dict(family='Computer Modern',size=11),
               margin=dict(l=5, r=5, t=30, b=5),
-              width=605, height= 250)
+              width=605, height= 250, title_x = 0.5,
+            #   legend=dict(orientation="h",
+            #                 yanchor="bottom",
+            #                 y=-.8,
+            #                 xanchor="right",
+            #                 x=0.2)
+            )
 path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/EV_Monta/Individual_EVs/'
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
@@ -232,7 +238,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
     x=df.index,
     y=df['z_act'],
     mode='lines',
-    name = "Plugged-in (actual) [true/false]",
+    name = "Plugged-in (actual)",
     line=dict(
         color='black',
         dash='dot',
@@ -243,25 +249,25 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         x=df.index,
         y=df['z_plan'],
         mode='lines',
-        name='Plugged-in (planned) [true/false]',
+        name='Plugged-in (planned)',
         line=dict(
             color='black',
     )))
 
-    fig.add_trace(go.Scatter(
-        x=df.index,
-        y=df['z_plan_everynight'],
-        mode='lines',
-        name='Plugged-in (planned) [true/false]',
-        line=dict(
-            color='black',
-    )))
+    # fig.add_trace(go.Scatter(
+    #     x=df.index,
+    #     y=df['z_plan_everynight'],
+    #     mode='lines',
+    #     name='Plugged-in (planned)',
+    #     line=dict(
+    #         color='black',
+    # )))
 
     fig.add_trace(go.Scatter(
         x=df.index,
         y=df['charge'],
         mode='lines',
-        name='Charge [kWh]',
+        name='Charge',
         marker=dict(
             size=10,
             opacity=0.8
@@ -276,7 +282,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         x=df.index,
         y=df['use'],
         mode='lines',
-        name='Use [kWh]',
+        name='Use',
         line=dict(
             color='red',
             width=2
@@ -287,7 +293,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         x=df.index,
         y=df['use_lin'],
         mode='lines',
-        name='Use (from interpolated SOC) [kWh]',
+        name='Use (interpolated)',
         line=dict(
             color='red',
             width=2,
@@ -331,14 +337,25 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
     #     )
     # ))
 
+    # fig.add_trace(go.Scatter(
+    #     x=df.index,
+    #     y=df['price'],
+    #     mode='lines',
+    #     name='Price',
+    #     line=dict(
+    #         color='purple',
+    #         width=1
+    #     )
+    # ))
+
     fig.add_trace(go.Scatter(
         x=df.index,
-        y=df['price'],
+        y=df['SOC'],
         mode='lines',
-        name='Price [DKK/kWh excl. tarifs]',
+        name = "SOC",
         line=dict(
-            color='purple',
-            width=1
+            color='lightblue',
+            width=2
         )
     ))
 
@@ -346,11 +363,10 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
     x=df.index,
     y=df['trueprice'],
     mode='lines',
-    name='Price (EnergiDataService.dk) [DKK/kWh excl. tarifs]',
+    name='Price',
     line=dict(
         color='purple',
-        width=1,
-        dash='dash'
+        width=1
     )
     ))
 
@@ -416,17 +432,6 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
     )))
 
     fig.add_trace(go.Scatter(
-        x=df.index,
-        y=df['SOC'],
-        mode='lines',
-        name = "SOC",
-        line=dict(
-            color='lightblue',
-            width=2
-        )
-    ))
-
-    fig.add_trace(go.Scatter(
     x=df.index,
     y=df['use_org_rolling'],
     mode='lines',
@@ -473,6 +478,16 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         # Export html
         fig.write_html(pathhtml + "PlainProfile_id" + str(id) + ".html")
         fig.update_layout(layout)
+        # For the x-ticks, only show every 7th day
+        fig.update_xaxes(
+            tickmode = 'array',
+            tickvals = [firsttime + datetime.timedelta(days=i) for i in range((lasttime-firsttime).days+1) if i%7==0],
+            ticktext = [str(firsttime + datetime.timedelta(days=i))[:10] for i in range((lasttime-firsttime).days+1) if i%7==0],
+            tickangle = 45
+        )
+        # Decrease linewidth of all lines
+        for i in range(len(fig.data)):
+            fig.data[i].line.width = 1
         # Export pdf
         fig.write_image(path + "PlainProfile_id"+ str(id) + ".pdf")
         
@@ -482,7 +497,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
     
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=32278, plot_efficiency_and_SOCmin=True, vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[89], vertical_hover=False)
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, vertical_hover=False, layout=layout)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, plot_efficiency_and_SOCmin=False, vertical_hover=False, layout=layout)
 # Drop variables in dfv
 dfv = dfv.drop(['use_dailyaverage', 'use_rolling', 'use_ewm', 'efficiency'], axis=1)
 print(round(dfv.iloc[-5:],2).to_latex())

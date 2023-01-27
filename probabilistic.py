@@ -178,7 +178,14 @@ if plot:
         fig.add_trace(go.Scatter
             (x=mu.index, y=samples[i,:], mode='lines', name="Sample "+str(i), line=dict(width=0.5, color='gray')))
     fig.update_layout(title='Statistical scenarios sampled from the multivariate normal distribution', xaxis_title='Timestep', yaxis_title='Residual')
-    # Have legend inside plot at the right
+    # Change legend to be horizontal below the plot
+    fig.update_layout(legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=-.22,
+        xanchor="right",
+        x=1
+    ))
     # Center title
     fig.write_html(pathhtml + "/Samples_from_multivariate_normal_distribution_Carnot.html")
     fig.show()
