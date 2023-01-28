@@ -230,25 +230,25 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         lasttime = df.index[-1]
 
     #################### START THE PLOTTING ###########################################
-    # fig = go.Figure([go.Scatter(
-    # x=df.index,
-    # y=df['z_act'],
-    # mode='lines',
-    # name = "Plugged-in (actual)",
-    # line=dict(
-    #     color='black',
-    #     dash='dot',
-    # ))])
+    fig = go.Figure([go.Scatter(
+    x=df.index,
+    y=df['z_act'],
+    mode='lines',
+    name = "Plugged-in (actual)",
+    line=dict(
+        color='black',
+        dash='dot',
+    ))])
 
-    # # Plot the result
-    # fig.add_trace(go.Scatter(
-    #     x=df.index,
-    #     y=df['z_plan'],
-    #     mode='lines',
-    #     name='Plugged-in (planned)',
-    #     line=dict(
-    #         color='black',
-    # )))
+    # Plot the result
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df['z_plan'],
+        mode='lines',
+        name='Plugged-in (planned)',
+        line=dict(
+            color='black',
+    )))
 
     fig = go.Figure([go.Scatter(
         x=df.index,
@@ -259,31 +259,31 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
             color='black',
     ))])
 
-    # fig.add_trace(go.Scatter(
-    #     x=df.index,
-    #     y=df['charge'],
-    #     mode='lines',
-    #     name='Charge',
-    #     marker=dict(
-    #         size=10,
-    #         opacity=0.8
-    #     ),
-    #     line=dict(
-    #         color='green',
-    #         width=2
-    #     )
-    # ))
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df['charge'],
+        mode='lines',
+        name='Charge',
+        marker=dict(
+            size=10,
+            opacity=0.8
+        ),
+        line=dict(
+            color='green',
+            width=2
+        )
+    ))
 
-    # fig.add_trace(go.Scatter(
-    #     x=df.index,
-    #     y=df['use'],
-    #     mode='lines',
-    #     name='Use',
-    #     line=dict(
-    #         color='red',
-    #         width=2
-    #     )
-    # ))
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df['use'],
+        mode='lines',
+        name='Use',
+        line=dict(
+            color='red',
+            width=2
+        )
+    ))
 
     fig.add_trace(go.Scatter(
         x=df.index,
@@ -297,113 +297,113 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         )
     ))
 
-    # # fig.add_trace(go.Scatter(
-    # # x=df.index,
-    # # y=df['use_rolling'],
-    # # mode='lines',
-    # # name='Use ('+str(7)+' day rolling mean) [kWh]',
-    # # line=dict(
-    # #     color='red',
-    # #     width=2,
-    # #     dash='dot'
-    # # )
-    # # ))
-
-    # # fig.add_trace(go.Scatter(
-    # # x=df.index,
-    # # y=df['use_ewm'],
-    # # mode='lines',
-    # # name='Use (Exponentially Weighted Moving Average with half life = '+str(2)+') [kWh]',
-    # # line=dict(
-    # #     color='red',
-    # #     width=2,
-    # #     dash='dash'
-    # # )
-    # # ))
-
-    # # fig.add_trace(go.Scatter(
-    # #     x=df.index,
-    # #     y=df['use_dailyaverage'],
-    # #     mode='lines',
-    # #     name='Use daily average (outside of plug-in) [kWh]',
-    # #     line=dict(
-    # #         color='red',
-    # #         width=0.5,
-    # #         dash='dash'
-    # #     )
-    # # ))
-
-    # # fig.add_trace(go.Scatter(
-    # #     x=df.index,
-    # #     y=df['price'],
-    # #     mode='lines',
-    # #     name='Price',
-    # #     line=dict(
-    # #         color='purple',
-    # #         width=1
-    # #     )
-    # # ))
-
     # fig.add_trace(go.Scatter(
-    #     x=df.index,
-    #     y=df['SOC'],
-    #     mode='lines',
-    #     name = "SOC",
-    #     line=dict(
-    #         color='lightblue',
-    #         width=2
-    #     )
+    # x=df.index,
+    # y=df['use_rolling'],
+    # mode='lines',
+    # name='Use ('+str(7)+' day rolling mean) [kWh]',
+    # line=dict(
+    #     color='red',
+    #     width=2,
+    #     dash='dot'
+    # )
     # ))
 
     # fig.add_trace(go.Scatter(
     # x=df.index,
-    # y=df['trueprice'],
+    # y=df['use_ewm'],
     # mode='lines',
-    # name='Price',
+    # name='Use (Exponentially Weighted Moving Average with half life = '+str(2)+') [kWh]',
     # line=dict(
-    #     color='purple',
-    #     width=1
+    #     color='red',
+    #     width=2,
+    #     dash='dash'
     # )
     # ))
 
     # fig.add_trace(go.Scatter(
     #     x=df.index,
-    #     y=df['SOCmax'],
+    #     y=df['use_dailyaverage'],
     #     mode='lines',
-    #     name = "SOC max [kWh]",
-    #     line=dict(width=2, color='grey') #color='DarkSlateGrey')
-    #     # Add index value to hovertext
-    #     # hovertext = df.index
+    #     name='Use daily average (outside of plug-in) [kWh]',
+    #     line=dict(
+    #         color='red',
+    #         width=0.5,
+    #         dash='dash'
+    #     )
     # ))
 
+    # fig.add_trace(go.Scatter(
+    #     x=df.index,
+    #     y=df['price'],
+    #     mode='lines',
+    #     name='Price',
+    #     line=dict(
+    #         color='purple',
+    #         width=1
+    #     )
+    # ))
+
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df['SOC'],
+        mode='lines',
+        name = "SOC",
+        line=dict(
+            color='lightblue',
+            width=2
+        )
+    ))
+
+    fig.add_trace(go.Scatter(
+    x=df.index,
+    y=df['trueprice'],
+    mode='lines',
+    name='Price',
+    line=dict(
+        color='purple',
+        width=1
+    )
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df['SOCmax'],
+        mode='lines',
+        name = "SOC max [kWh]",
+        line=dict(width=2, color='grey') #color='DarkSlateGrey')
+        # Add index value to hovertext
+        # hovertext = df.index
+    ))
+
     if plot_efficiency_and_SOCmin:
-        # fig.add_trace(go.Scatter(
-        #     x=df.index,
-        #     y=df['efficiency']*100,
-        #     mode='lines',
-        #     name = "Efficiency [%]",
-        #     line=dict(width=2, color='DarkSlateGrey')
-        # ))
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df['efficiency']*100,
+            mode='lines',
+            name = "Efficiency [%]",
+            line=dict(width=2, color='DarkSlateGrey')
+        ))
 
-        # fig.add_trace(go.Scatter(
-        #     x=df.index,
-        #     y=df['efficiency_median']*100,
-        #     mode='lines',
-        #     name = "Efficiency median [%]",
-        #     line=dict(width=2, color='DarkSlateGrey', dash='dot')
-        # ))
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df['efficiency_median']*100,
+            mode='lines',
+            name = "Efficiency median [%]",
+            line=dict(width=2, color='DarkSlateGrey', dash='dot')
+        ))
 
-        # fig.add_trace(go.Scatter(
-        #     x=df.index,
-        # y=df['SOC_lin'],
-        # mode='lines',
-        # name = "SOC (linear interpolation)",
-        # line=dict(
-        #     color='lightblue',
-        #     width=2,
-        #     dash='dot'
-        # )
-        # ))
+        fig.add_trace(go.Scatter(
+            x=df.index,
+        y=df['SOC_lin'],
+        mode='lines',
+        name = "SOC (linear interpolation)",
+        line=dict(
+            color='lightblue',
+            width=2,
+            dash='dot'
+        )
+        ))
 
         fig.add_trace(go.Scatter(
             x=df.index,
@@ -412,31 +412,31 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
             name = "Minimum SOC",
             line=dict(
                 color='lightblue',
-                width=2
+                width=2 , dash='dash'
             )
             ))
 
     fig.add_trace(go.Scatter(
         x=df.index,
-        y=0.8 * df['BatteryCapacity'],
+        y=df['BatteryCapacity'],
         mode='lines',
-        name = "Maximum SOC",
+        name = "Battery Capacity [kWh]",
         line=dict(
             color='darkgrey',
             dash='dash'
     )))
 
-    # fig.add_trace(go.Scatter(
-    # x=df.index,
-    # y=df['use_org_rolling'],
-    # mode='lines',
-    # name = "Rolling Use (10 days)",
-    # line=dict(
-    #     color='red',
-    #     width=1,
-    #     dash='dash'
-    # )
-    # ))
+    fig.add_trace(go.Scatter(
+    x=df.index,
+    y=df['use_org_rolling'],
+    mode='lines',
+    name = "Rolling Use (10 days)",
+    line=dict(
+        color='red',
+        width=1,
+        dash='dash'
+    )
+    ))
 
     if vertical_hover:
         # Add vertical hover lines
@@ -462,7 +462,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
     fig.update_layout(
         title_text="Charging by " +str(var) + "="+ str(id) + "               from "+str(firsttime)+"    to   "+str(lasttime), # title of plot
         xaxis_title_text="Date", # xaxis label
-        yaxis_title_text="kWh or plugged in [1,  else  -1]", # yaxis label
+        yaxis_title_text="kWh or DKK/kWh or True-False [1,-1]", # yaxis label
         #font=dict(
         #    size=18,
         #    color="RebeccaPurple"
@@ -480,11 +480,11 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
             ticktext = [str(firsttime + datetime.timedelta(days=i))[:10] for i in range((lasttime-firsttime).days+1) if i%7==0],
             tickangle = 45
         )
-        # Remove x-ticks and xaxis title text (TEMPORARY)
-        fig.update_xaxes(
-            showticklabels=False,
-            title_text=""
-        )
+        # # Remove x-ticks and xaxis title text (TEMPORARY)
+        # fig.update_xaxes(
+        #     showticklabels=False,
+        #     title_text=""
+        # )
 
         # Decrease linewidth of all lines
         for i in range(len(fig.data)):
@@ -496,7 +496,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         fig.show()
     return df
 # Export plots for report
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=10885, plot_efficiency_and_SOCmin=True, vertical_hover=False, layout=layout, imgtitle="assumptions_id")
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=10885, plot_efficiency_and_SOCmin=True, vertical_hover=False)
 
 
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=10885, plot_efficiency_and_SOCmin=True, vertical_hover=False)
