@@ -921,7 +921,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         fig.show()
     return df
 
-def MontasSmartCharge(dfv, u, z, L, b0, r):
+def MontasSmartCharge(dfv, u, z, L, b0, r, c_tilde):
     # define c as the minimum between price and trueprice ignoring nan to allow benefit of the DK1/DK2 doubt in favor of Montas algorithm
     c = dfv[['price', 'trueprice']].min(axis=1, skipna=True)
     x = dfv['charge']
@@ -932,6 +932,6 @@ def MontasSmartCharge(dfv, u, z, L, b0, r):
     b[0] = b0
     for i in range(len(dfv)):
         b[i+1] = b[i] + r*x[i] - u[i]
-    total_cost = sum(x * c)
+    total_cost = np.sum(x * c) - c_tilde * (b[-1] - b0)
     prob = {'x':x[:L], 'b':b[:(L+1)], 'u':u[:L], 'c':c[:L], 'z':z[:L], 'objective':total_cost}
     return(prob, x, b)
