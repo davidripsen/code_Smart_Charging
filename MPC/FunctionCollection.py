@@ -78,7 +78,8 @@ def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u_t_true, u_forecast, z
     # Return results
     return(prob, x, b)
 
-def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, z=np.nan, starttime='', endtime='', export=False, export_only = False, BatteryCap=60, firsthour=0, vehicle_id=''):
+
+def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, z=np.nan, starttime='', endtime='', export=False, export_only = False, BatteryCap=60, firsthour=0, vehicle_id='', SOCorg=None):
         # Identify iterative-appended, self-made prob
     fig = go.Figure()
     if type(prob) == dict:
@@ -90,6 +91,9 @@ def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, z=np.nan, s
         fig.add_trace(go.Scatter(x=tvec, y=[value(prob['c'][t]) for t in tvec], mode='lines', name='True Price'))
         fig.add_trace(go.Scatter(x=tvec, y=[prob['z'][t]*2-1 for t in tvec], mode='lines', name='Plugged-in', line=dict(color='black', width=0.5)))
         obj = prob['objective']
+        if SOCorg is not None:
+            fig.add_trace(go.Scatter(x=tvec_b, y=[SOCorg[t] for t in tvec_b], mode='lines', name='Original SOC'))
+        
     else:
         tvec = np.arange(0, len(x))
         tvec_b = np.arange(0, len(b))
@@ -931,4 +935,3 @@ def MontasSmartCharge(dfv, u, z, L, b0, r):
     total_cost = sum(x * c)
     prob = {'x':x[:L], 'b':b[:(L+1)], 'u':u[:L], 'c':c[:L], 'z':z[:L], 'objective':total_cost}
     return(prob, x, b)
-    # MANGLER test:-)

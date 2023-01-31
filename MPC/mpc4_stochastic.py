@@ -12,7 +12,7 @@ import plotly.express as px
 import pandas as pd
 import datetime as dt
 from sklearn_extra.cluster import KMedoids
-from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge, ExtractEVdataForMPC, MultiDay
+from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge, ExtractEVdataForMPC, MultiDay, MontasSmartCharge
 pd.set_option('display.max_rows', 500)
 runMany = True
 runDeterministicReference = True
@@ -35,8 +35,8 @@ R = []
 idsOfInterest = [25701] #[1601, 30299, 6817, 18908] # Ids where perfect foresight fails
 for i in range(len(DFV)):
     # i=2 Good performance (from stochastic model), i=3: Shitty performance
-    dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
-                                                                                                                                                    uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
+    dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan', u_var='use_lin',
+                                                                                                                                                    uhat_var='use_org_rolling', bmin_var='SOCmin', p=0.10)
     R.append(r)
     if vehicle_id not in idsOfInterest:
         continue
@@ -309,70 +309,78 @@ for i in range(len(DFV)):
         #print("Objective value = ", np.sum([value(x[t]) * c_within[t] for t in tvec_within]) - c_tilde * (value(b[T+1]) - b[0]))
 
         # ### DumbCharge
-        # prob_dc, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r, verbose=False)
-        # plot_EMPC(prob_dc, 'Dumb Charge   of vehicle = ' + str(vehicle_id) + '   r = '+str(r), x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+        prob_dc, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r, verbose=False)
+        plot_EMPC(prob_dc, 'Dumb Charge   of vehicle = ' + str(vehicle_id) + '   r = '+str(r), x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
-# Make boxplot of median efficiencies R
-fig = go.Figure()
-fig.add_trace(go.Box(y=R, name='Efficiency'))
-fig.update_layout(title='Median Efficiencies of each vehicle', xaxis_title='Efficiency', yaxis_title='Efficiency')
-fig.update_yaxes(range=[0.5, 1.3])
-fig.add_shape(type="line", x0=-1, x1=1, y0=1, y1=1, line=dict(color="LightSeaGreen", width=2, dash="dash"))
-fig.update(layout)
-fig.write_image(path+"Efficiencies.pdf")
-fig.show()
-
-# Calculate quantiles of Rs
-np.quantile(R, [0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99])
+        # Montas Historical Smart Charges
+        prob_msc, x, b = MontasSmartCharge(dfv, u, z, L, b0, r)
+        plot_EMPC(prob_msc, 'Montas Smart Charge (r-corrected b[t]) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id, SOCorg=dfv['SOC'])
 
 
-# Visualise mediods
-fig = go.Figure()
-for i in range(n_clusters):
-    fig.add_trace(go.Scatter(x=np.arange(len(mediods[i])), y=mediods[i], name='Mediod '+str(i)))
-fig.update_layout(title=str(n_clusters) + ' Mediods', xaxis_title='Time', yaxis_title='Price')
-fig.update_yaxes(range=[-3, 3])
-fig.show()
-
-# Visualise n scenarios
-fig = go.Figure()
-for i in range(n_clusters):
-    fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)))
-fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
-fig.update_yaxes(range=[-3, 3])
-fig.show()
-
-# Visualise first 50 scenarios
-fig = go.Figure()
-for i in range(50):
-    fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)))
-fig.update_layout(title=str(50) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
-fig.update_yaxes(range=[-3, 3])
-fig.show()
-
-# Visualise 10 random scenarios
-fig = go.Figure()
-j = np.random.randint(0, scenarios_all.shape[0]-n_clusters)
-for i in range(10):
-    fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[j+i,:], name='Scenario '+str(i)))
-fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
-fig.update_yaxes(range=[-3, 3])
-fig.show()
 
 
-for k in [0, 100, 200, 300, 400, 500, 600, 700, 800]:
-    n_clusters = 10
-    c_forecast = dfp.iloc[k, 3:3+145].to_numpy() + scenarios_all
-    c_forecasat = c_forecast[c_forecast<0] = 0
-    c_forecast
 
-    # Visualise n scenarios
-    fig = go.Figure()
-    for i in range(n_clusters):
-        fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=c_forecast[i], name='Scenario '+str(i)))
-    fig.update_layout(title=str(n_clusters) + ' Scenarios  at k='+str(k), xaxis_title='Time', yaxis_title='Price')
-    fig.update_yaxes(range=[-1, 6])
-    fig.show()
+# # Make boxplot of median efficiencies R
+# fig = go.Figure()
+# fig.add_trace(go.Box(y=R, name='Efficiency'))
+# fig.update_layout(title='Median Efficiencies of each vehicle', xaxis_title='Efficiency', yaxis_title='Efficiency')
+# fig.update_yaxes(range=[0.5, 1.3])
+# fig.add_shape(type="line", x0=-1, x1=1, y0=1, y1=1, line=dict(color="LightSeaGreen", width=2, dash="dash"))
+# fig.update(layout)
+# fig.write_image(path+"Efficiencies.pdf")
+# fig.show()
+
+# # Calculate quantiles of Rs
+# np.quantile(R, [0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99])
+
+
+# # Visualise mediods
+# fig = go.Figure()
+# for i in range(n_clusters):
+#     fig.add_trace(go.Scatter(x=np.arange(len(mediods[i])), y=mediods[i], name='Mediod '+str(i)))
+# fig.update_layout(title=str(n_clusters) + ' Mediods', xaxis_title='Time', yaxis_title='Price')
+# fig.update_yaxes(range=[-3, 3])
+# fig.show()
+
+# # Visualise n scenarios
+# fig = go.Figure()
+# for i in range(n_clusters):
+#     fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)))
+# fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
+# fig.update_yaxes(range=[-3, 3])
+# fig.show()
+
+# # Visualise first 50 scenarios
+# fig = go.Figure()
+# for i in range(50):
+#     fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)))
+# fig.update_layout(title=str(50) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
+# fig.update_yaxes(range=[-3, 3])
+# fig.show()
+
+# # Visualise 10 random scenarios
+# fig = go.Figure()
+# j = np.random.randint(0, scenarios_all.shape[0]-n_clusters)
+# for i in range(10):
+#     fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[j+i,:], name='Scenario '+str(i)))
+# fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
+# fig.update_yaxes(range=[-3, 3])
+# fig.show()
+
+
+# for k in [0, 100, 200, 300, 400, 500, 600, 700, 800]:
+#     n_clusters = 10
+#     c_forecast = dfp.iloc[k, 3:3+145].to_numpy() + scenarios_all
+#     c_forecasat = c_forecast[c_forecast<0] = 0
+#     c_forecast
+
+#     # Visualise n scenarios
+#     fig = go.Figure()
+#     for i in range(n_clusters):
+#         fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=c_forecast[i], name='Scenario '+str(i)))
+#     fig.update_layout(title=str(n_clusters) + ' Scenarios  at k='+str(k), xaxis_title='Time', yaxis_title='Price')
+#     fig.update_yaxes(range=[-1, 6])
+#     fig.show()
 
 
 
