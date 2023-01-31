@@ -12,9 +12,9 @@ import plotly.express as px
 import pandas as pd
 from datetime import datetime
 if __name__ == '__main__':
-    from FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge, ExtractEVdataForMPC, MultiDay, StochasticProgram, MultiDayStochastic, getMediods
+    from FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge, ExtractEVdataForMPC, MultiDay, StochasticProgram, MultiDayStochastic, getMediods, MontasSmartCharge
 else:
-    from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge, ExtractEVdataForMPC, MultiDay, StochasticProgram, MultiDayStochastic, getMediods
+    from code_Smart_Charging.MPC.FunctionCollection import ImperfectForesight, PerfectForesight, plot_EMPC, DumbCharge, ExtractEVdataForMPC, MultiDay, StochasticProgram, MultiDayStochastic, getMediods, MontasSmartCharge
 import os
 now = datetime.now()
 nowstring = now.strftime("%d-%m-%Y__%Hh_%Mm_%Ss")
@@ -23,7 +23,7 @@ np.random.seed(2812)
 
 # Choose
 runDeterministicReference = True
-NOTE = 'small fix in prices' # Optional message to output folder
+NOTE = 'added historic monta-smart-charges' # Optional message to output folder
 print(NOTE)
 
 # Save results, note and copy of code
@@ -45,7 +45,7 @@ AbsolutePerformance = lambda x, dc:       dc-x
 
 # Models
 models_h = ['stoch', 'mda'] #['stochKM', 'stoch', 'mda']
-models_plain = ['da', 'pf', 'dc']
+models_plain = ['da', 'pf', 'dc', 'hist'] # hist = historic charging using Montas Smart Charging
 horizons = [4]
 models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for h in horizons]
 
@@ -138,6 +138,12 @@ for i in range(len(DFV)):
         results['dc'][i] = round(value(prob_dc.objective),2)
         infeasibles['dc'][i] = '  ' if flagFeasible_dc else ' x '
         
+        ### Historic Montas Smart Charges
+        prob_msc, x, b = MontasSmartCharge(dfv, u, z, L, b0, r, c_tilde)
+        plot_EMPC(prob_msc, 'Montas Smart Charge (r-corrected b[t]) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id, SOCorg=dfv['SOC'])
+        results['hist'][i] = round(value(prob_msc.objective),2)
+        infeasibles['hist'][i] = '  '# if LpStatus[prob_msc.status] == 'Optimal' else ' x '
+
         ### Evaluate performances
         for model in models:
             relativePerformances[model][i] = round(RelativePerformance(results[model][i], results['pf'][i], results['dc'][i]),2)

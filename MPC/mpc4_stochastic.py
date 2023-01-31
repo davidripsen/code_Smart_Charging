@@ -20,7 +20,7 @@ layout = dict(font=dict(family='Computer Modern',size=11),
               margin=dict(l=5, r=5, t=30, b=5),
               width=605, height= 250,
               title_x = 0.5)
-path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/EV_Monta/'
+path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/Carnot/'
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
 # Read scenarios from txt
@@ -269,7 +269,7 @@ for i in range(len(DFV)):
     plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
     # ### Run the problem on mediods
-    n_clusters=10
+    n_clusters=20
     mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
     # h = 4*24 # 5 days horizon for the multi-day smart charge
     # prob_stochKM, x, b, flag_AllFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=weights, maxh = 6*24)
@@ -313,7 +313,7 @@ for i in range(len(DFV)):
         plot_EMPC(prob_dc, 'Dumb Charge   of vehicle = ' + str(vehicle_id) + '   r = '+str(r), x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
         # Montas Historical Smart Charges
-        prob_msc, x, b = MontasSmartCharge(dfv, u, z, L, b0, r)
+        prob_msc, x, b = MontasSmartCharge(dfv, u, z, L, b0, r, c_tilde)
         plot_EMPC(prob_msc, 'Montas Smart Charge (r-corrected b[t]) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id, SOCorg=dfv['SOC'])
 
 
@@ -334,38 +334,62 @@ for i in range(len(DFV)):
 # np.quantile(R, [0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99])
 
 
-# # Visualise mediods
-# fig = go.Figure()
-# for i in range(n_clusters):
-#     fig.add_trace(go.Scatter(x=np.arange(len(mediods[i])), y=mediods[i], name='Mediod '+str(i)))
-# fig.update_layout(title=str(n_clusters) + ' Mediods', xaxis_title='Time', yaxis_title='Price')
-# fig.update_yaxes(range=[-3, 3])
-# fig.show()
+# Visualise mediods
+fig = go.Figure()
+for i in range(n_clusters):
+    fig.add_trace(go.Scatter(x=np.arange(len(mediods[i])), y=mediods[i], name='Mediod '+str(i)))
+fig.update_layout(title=str(n_clusters) + ' Mediods', xaxis_title='Time', yaxis_title='Price')
+fig.update_yaxes(range=[-3, 3])
+fig.show()
 
-# # Visualise n scenarios
-# fig = go.Figure()
-# for i in range(n_clusters):
-#     fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)))
-# fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
-# fig.update_yaxes(range=[-3, 3])
-# fig.show()
+# Visualise n scenarios
+fig = go.Figure()
+for i in range(n_clusters):
+    fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)))
+fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
+fig.update_yaxes(range=[-3, 3])
+fig.show()
 
-# # Visualise first 50 scenarios
-# fig = go.Figure()
-# for i in range(50):
-#     fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)))
-# fig.update_layout(title=str(50) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
-# fig.update_yaxes(range=[-3, 3])
-# fig.show()
+# Make the above plots into a 2 x 1 plot
+from plotly.subplots import make_subplots
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1, shared_yaxes=True)
+for i in range(n_clusters):
+    fig.add_trace(go.Scatter(x=np.arange(len(mediods[i])), y=mediods[i], name='Mediod '+str(i)), row=1, col=1)
+for i in range(n_clusters):
+    fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)), row=2, col=1)
+fig.update_yaxes(range=[-3, 3], row=1, col=1, title_text="Price")
+fig.update_yaxes(range=[-3, 3], row=2, col=1, title_text="Price")
+fig.update_layout(title=str(n_clusters) + ' mediods (above) and ' + str(n_clusters)+ ' raw scenarios (below)')
+# Adjust placement of xaixs title
+fig.update_xaxes(title_text="Hours ahead", row=2, col=1)
+fig.write_html(pathhtml + "/mediods_vs_scenarios.html")
+fig.update_layout(showlegend=False)
+fig.update_layout(layout)
+fig.write_image(path + "/mediods_vs_scenarios.pdf")
+#fig.show()
 
-# # Visualise 10 random scenarios
-# fig = go.Figure()
-# j = np.random.randint(0, scenarios_all.shape[0]-n_clusters)
-# for i in range(10):
-#     fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[j+i,:], name='Scenario '+str(i)))
-# fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
-# fig.update_yaxes(range=[-3, 3])
-# fig.show()
+
+
+
+
+
+
+# Visualise first 50 scenarios
+fig = go.Figure()
+for i in range(50):
+    fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[i], name='Scenario '+str(i)))
+fig.update_layout(title=str(50) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
+fig.update_yaxes(range=[-3, 3])
+fig.show()
+
+# Visualise 10 random scenarios
+fig = go.Figure()
+j = np.random.randint(0, scenarios_all.shape[0]-n_clusters)
+for i in range(10):
+    fig.add_trace(go.Scatter(x=np.arange(len(scenarios_all[i])), y=scenarios_all[j+i,:], name='Scenario '+str(i)))
+fig.update_layout(title=str(n_clusters) + ' Scenarios', xaxis_title='Time', yaxis_title='Price')
+fig.update_yaxes(range=[-3, 3])
+fig.show()
 
 
 # for k in [0, 100, 200, 300, 400, 500, 600, 700, 800]:
