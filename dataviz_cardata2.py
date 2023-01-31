@@ -167,11 +167,11 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
 
         # If z_plan_everynight and corresponding bmin
         # z_plan_everynight:
-        df['z_plan_everynight'] = np.nan # df['z_plan_everynight'] = df['z_plan']
+        df['z_plan_everynight'] = -1 # df['z_plan_everynight'] = df['z_plan']
         df.loc[(df.index.hour >= 22) | (df.index.hour < 6), 'z_plan_everynight'] = 1
 
         # bmin_everymorning:
-        df['SOCmin_everymorning'] = np.nan #df['SOCmin_everymorning'] = df['SOCmin']
+        df['SOCmin_everymorning'] = min_alltime * df['BatteryCapacity']  #df['SOCmin_everymorning'] = df['SOCmin']
         df.loc[(df.index.hour == 6), 'SOCmin_everymorning'] = min_charged * df['BatteryCapacity']
 
         # Costs
@@ -231,13 +231,13 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
 
     #################### START THE PLOTTING ###########################################
     fig = go.Figure([go.Scatter(
-    x=df.index,
-    y=df['z_act'],
-    mode='lines',
-    name = "Plugged-in (actual)",
-    line=dict(
-        color='black',
-        dash='dot',
+        x=df.index,
+        y=df['z_act'],
+        mode='lines',
+        name = "Plugged-in (actual)",
+        line=dict(
+            color='black',
+            dash='dot',
     ))])
 
     # Plot the result
@@ -250,14 +250,14 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
             color='black',
     )))
 
-    fig = go.Figure([go.Scatter(
+    fig.add_trace(go.Scatter(
         x=df.index,
         y=df['z_plan_everynight'],
         mode='lines',
-        name='Plugged-in (planned)',
+        name='Plugged-in (assumption)',
         line=dict(
             color='black',
-    ))])
+    )))
 
     fig.add_trace(go.Scatter(
         x=df.index,
@@ -297,41 +297,41 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         )
     ))
 
-    fig.add_trace(go.Scatter(
-    x=df.index,
-    y=df['use_rolling'],
-    mode='lines',
-    name='Use ('+str(7)+' day rolling mean) [kWh]',
-    line=dict(
-        color='red',
-        width=2,
-        dash='dot'
-    )
-    ))
+    # fig.add_trace(go.Scatter(
+    # x=df.index,
+    # y=df['use_rolling'],
+    # mode='lines',
+    # name='Use ('+str(7)+' day rolling mean) [kWh]',
+    # line=dict(
+    #     color='red',
+    #     width=2,
+    #     dash='dot'
+    # )
+    # ))
 
-    fig.add_trace(go.Scatter(
-    x=df.index,
-    y=df['use_ewm'],
-    mode='lines',
-    name='Use (Exponentially Weighted Moving Average with half life = '+str(2)+') [kWh]',
-    line=dict(
-        color='red',
-        width=2,
-        dash='dash'
-    )
-    ))
+    # fig.add_trace(go.Scatter(
+    # x=df.index,
+    # y=df['use_ewm'],
+    # mode='lines',
+    # name='Use (Exponentially Weighted Moving Average with half life = '+str(2)+') [kWh]',
+    # line=dict(
+    #     color='red',
+    #     width=2,
+    #     dash='dash'
+    # )
+    # ))
 
-    fig.add_trace(go.Scatter(
-        x=df.index,
-        y=df['use_dailyaverage'],
-        mode='lines',
-        name='Use daily average (outside of plug-in) [kWh]',
-        line=dict(
-            color='red',
-            width=0.5,
-            dash='dash'
-        )
-    ))
+    # fig.add_trace(go.Scatter(
+    #     x=df.index,
+    #     y=df['use_dailyaverage'],
+    #     mode='lines',
+    #     name='Use daily average (outside of plug-in) [kWh]',
+    #     line=dict(
+    #         color='red',
+    #         width=0.5,
+    #         dash='dash'
+    #     )
+    # ))
 
     fig.add_trace(go.Scatter(
         x=df.index,
@@ -503,12 +503,11 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
     if not df_only:
         fig.show()
     return df
-# Export plots for report
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13923, plot_efficiency_and_SOCmin=True, vertical_hover=False, layout=layout, imgtitle="use_curves_id")
-
+## Export plots for report
+#dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13923, plot_efficiency_and_SOCmin=True, vertical_hover=False, layout=layout, imgtitle="use_curves_id")
 
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=10885, plot_efficiency_and_SOCmin=True, vertical_hover=False)
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[89], vertical_hover=False)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[99], vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, plot_efficiency_and_SOCmin=True, vertical_hover=False)
 # Drop variables in dfv
 dfv = dfv.drop(['use_dailyaverage', 'use_rolling', 'use_ewm', 'efficiency'], axis=1)
@@ -524,7 +523,7 @@ for id in ids:
 DFV = []
 indx = D2['capacity_kwh'] >= 40
 vehicles_sorted = D2['VEHICLE_ID'][indx].value_counts().index
-bad_ids = [6366, 3485] # No bad ids :-)
+bad_ids = [6366, 3485] # Bad ids
 N = 100 + len(bad_ids)
 for id in vehicles_sorted[:N]:
     if id in bad_ids:
@@ -539,6 +538,12 @@ for id in vehicles_sorted[:N]:
 with open('data/MPC-ready/df_vehicle_list.pkl', 'wb') as f:
     pickle.dump(DFV, f)
 
+
+# plot dfv.price and dfv.trueprice
+plt.plot(dfv.trueprice, label='trueprice')
+plt.plot(dfv.price, label='price')
+plt.legend()
+plt.show()
 
 
 # Make a new script for doing the juicy stuff
