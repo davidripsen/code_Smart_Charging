@@ -299,11 +299,13 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             # Extract forecasts from t=0..h
             c_forecast = dfp.iloc[i, (j+3):(3+H+1)].to_numpy();
             if perfectForesight:
-                c_forecast = dft.iloc[i, (j+3):(3+H+1)].to_numpy();
-            
+                #c_forecast = dft.iloc[i, (j+3):(3+H+1)].to_numpy();
+                c_forecast = c[k:k+h+1]
+                
             # Patch holes in forecasts (2 out of 2) - use known prices
-            c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(3+H+1)].to_numpy()[:min(l,h+1)]
-
+            #c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(3+H+1)].to_numpy()[:min(l,h+1)]
+            c_forecast[:min(l,h+1)] = c[k:k+min(l,h+1)]
+            
             # Extract deterministic and stochastic prices
             if KMweights is None:
                 idx = np.random.randint(0, scenarios.shape[0]-n_scenarios)
@@ -411,10 +413,13 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
             #c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy()
             c_forecast = dfp.iloc[i, (j+3):(3+H+1)].to_numpy()
             if perfectForesight:
-                c_forecast = dft.iloc[i, (j+3):(3+H+1)].to_numpy();
+                #c_forecast = dft.iloc[i, (j+3):(3+H+1)].to_numpy();
+                c_forecast = c[k:k+h+1]
                 
             # Patch holes in forecasts (2 out of 2) - use known prices
-            c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(3+H+1)].to_numpy()[:min(l,h+1)]
+            #c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(3+H+1)].to_numpy()[:min(l,h+1)]
+            c_forecast[:min(l,h+1)] = c[k:k+min(l,h+1)]
+            
             
             # Find relevant input at the specific hours of flexibility
             tvec_i = np.arange(k, k+h+1)
@@ -426,6 +431,7 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
                 u_forecast = u[tvec_i]
             u_t_true = u[k]
             
+            assert len(c_forecast) >= 12, "c_forecast too short"
 
             # Solve
             if z_i[0] != 0:
@@ -450,14 +456,15 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
             X[k]=x0;                # Amount charged in the now-hour
             B[k+1]=b1;              # Battery level after the now-hour / beggining of next hour
             costs += x0 * c[k];                       # Cost of charging in the now-hour
+            #print(c[k+0], dft.iloc[i,j+3+0], c_forecast[0+0], dfp.iloc[i,j+3+0], j, l)
             b0 = b1                                   # Next SOC start is the current SOC
             k += 1
-
+            
             # THE END
             if k == L:
                 # Costs
                 total_cost = np.sum(costs) - c_tilde * (B[-1] - B[0])
-
+                
                 # Any non-feasibilities
                 if any(B<0) or any(B > 1.25*bmax):
                     flag_AllFeasible = False
@@ -495,7 +502,7 @@ def ExtractEVdataForMPC(dfv, z_var, u_var, uhat_var, bmin_var, p):
     firsthour = dfv.index[0].hour
     dfp = dfp[(dfp['Atime'] >= timestamps[0]) & (dfp['Atime'] <= timestamps[-1])].reset_index(drop=True) # The forecast history is the bottleneck
     dft = dft[(dft['Atime'] >= timestamps[0]) & (dft['Atime'] <= timestamps[-1])].reset_index(drop=True)
-    dfv = dfv.reset_index(drop=True)
+    dfv = dfv.reset_index(drop=False)
 
     ## Print occurences of number of hours between forecasts
     #dfp.Atime_diff.value_counts() # Up to 66 hours between forecasts
@@ -909,3 +916,19 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
     if not df_only:
         fig.show()
     return df
+
+def MontasSmartCharge(dfv, u, z, L, b0, r):
+    # define c as the minimum between price and trueprice ignoring nan to allow benefit of the DK1/DK2 doubt in favor of Montas algorithm
+    c = dfv[['price', 'trueprice']].min(axis=1, skipna=True)
+    x = dfv['charge']
+    u = u
+    z = z
+    # b_t+1 = b0 + r*x - u
+    b = np.zeros(len(dfv)+1)
+    b[0] = b0
+    for i in range(len(dfv)):
+        b[i+1] = b[i] + r*x[i] - u[i]
+    total_cost = sum(x * c)
+    prob = {'x':x[:L], 'b':b[:(L+1)], 'u':u[:L], 'c':c[:L], 'z':z[:L], 'objective':total_cost}
+    return(prob, x, b)
+    # MANGLER test:-)

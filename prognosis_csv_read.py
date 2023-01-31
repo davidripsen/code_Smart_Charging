@@ -14,8 +14,8 @@ import matplotlib.backends.backend_pdf
 import seaborn as sns
 
 pd.set_option('display.max_rows', 500)
-plot = True
-plot_alot = True
+plot = False
+plot_alot = False
 use_carnot = True
 # Plotly layout
 layout = dict(font=dict(family='Computer Modern',size=11),
@@ -69,8 +69,8 @@ if use_carnot:
 
     # Cut away forecasts after 2022-11-11
     df = df[df['Atime'] < '2022-11-11']
+    horizons = df.Atime.value_counts()
     if plot_alot:
-        horizons = df.Atime.value_counts()
         plt.hist(horizons, bins=60, label="Prior processing")
         plt.xlim(0, 170)
         plt.ylim(0, 600)
@@ -298,7 +298,6 @@ def SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=None, 
             vals = np.pad(vals, (0, np.max([0, h+1 - len(vals)+1]) ), 'constant', constant_values=BigM)
             df2.loc[df2['Atime'] == Atime, 't' + str(i)] = vals[i]
 
-            
 
     # Calculate number of hours until next Atime
     df2['Atime_next'] = df2['Atime'].shift(-1)
@@ -319,8 +318,8 @@ def SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=None, 
             for i in range(0, wk):
                 df2.loc[j, 't' + str(i)] = dftrue.loc[j, 't' + str(i)]
     return df2
-#dft = SliceDataFrame(df, h, var='TruePrice', BigM=BigM) #df with TruePrice as values
-#dfp = SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
+dft = SliceDataFrame(df, h, var='TruePrice', BigM=BigM) #df with TruePrice as values
+dfp = SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
 
 if not use_carnot:
     # df with only known prices, for imput to Day-Ahead Smart Charge
@@ -339,8 +338,8 @@ if not use_carnot:
     dfk.to_csv('data/MPC-ready/df_knownprices_for_mpc.csv', index=False)
 
 ### Export to csv
-#dft.to_csv('data/MPC-ready/df_trueprices_for_mpc.csv', index=False)
-#dfp.to_csv('data/MPC-ready/df_predprices_for_mpc.csv', index=False)
+dft.to_csv('data/MPC-ready/df_trueprices_for_mpc.csv', index=False)
+dfp.to_csv('data/MPC-ready/df_predprices_for_mpc.csv', index=False)
 
 # Import from csv
 dft = pd.read_csv('data/MPC-ready/df_trueprices_for_mpc.csv')

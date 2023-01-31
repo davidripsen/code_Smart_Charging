@@ -11,7 +11,7 @@ sns.set_theme()
 pio.renderers.default = "browser"
 pd.set_option('display.max_rows', 200)
 
-folder = '27-01-2023__15h_45m_14s'
+folder = '30-01-2023__15h_40m_18s'
 D = pd.read_csv('results/'+folder+'/relativePerformances.csv')
 D = D[D != ' - ']
 #D = D.dropna()

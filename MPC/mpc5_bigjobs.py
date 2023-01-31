@@ -23,7 +23,7 @@ np.random.seed(2812)
 
 # Choose
 runDeterministicReference = True
-NOTE = 'BigBoi' # Optional message to output folder
+NOTE = 'small fix in prices' # Optional message to output folder
 print(NOTE)
 
 # Save results, note and copy of code
@@ -46,11 +46,11 @@ AbsolutePerformance = lambda x, dc:       dc-x
 # Models
 models_h = ['stoch', 'mda'] #['stochKM', 'stoch', 'mda']
 models_plain = ['da', 'pf', 'dc']
-horizons = [3, 4, 5, 6]
+horizons = [4]
 models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for h in horizons]
 
 # n_clusters  (= n_scenarios)
-n_clusters=20
+n_clusters=10
 
 # Read scenarios from txt
 scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenarios_all=scenarios;
