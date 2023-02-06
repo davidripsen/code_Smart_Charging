@@ -508,10 +508,17 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
 
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=10885, plot_efficiency_and_SOCmin=True, vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[99], vertical_hover=False)
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, plot_efficiency_and_SOCmin=True, vertical_hover=False)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, plot_efficiency_and_SOCmin=True, vertical_hover=False, df_only=False)
 # Drop variables in dfv
 dfv = dfv.drop(['use_dailyaverage', 'use_rolling', 'use_ewm', 'efficiency'], axis=1)
-print(round(dfv.iloc[-5:],2).to_latex())
+# Add index as the first column and reset index
+# dfv.insert(0, 'time', dfv.index)
+# dfv = dfv.reset_index(drop=True)
+# # transpose dfv
+# dfv = dfv.T
+# print(round(dfv.iloc[:,[0,-1]],2).to_latex())
+# print(round(dfp.iloc[[0,1,2,3,4,5,-3,-2,-1],[0,1,2,3,4,5,6,-3,-2,-1]],2).to_latex())
+
 
 ids = [30299, 6817, 18908] # Ids where perfect foresight fails
 for id in ids:

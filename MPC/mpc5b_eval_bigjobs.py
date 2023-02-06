@@ -17,7 +17,7 @@ layout = dict(font=dict(family='Computer Modern',size=11),
 path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/Results/'
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
-folder = '27-01-2023__15h_45m_14s'
+folder = '31-01-2023__17h_10m_39s'
 D = pd.read_csv('results/'+folder+'/relativePerformances.csv')
 D = D[D != ' - ']
 #D = D.dropna()
@@ -42,6 +42,7 @@ for i, col in enumerate(D.columns):
     if col not in ['pf','dc','vehicle_id']:
         fig.add_trace(go.Box(y=D[col], name=col, boxpoints='all', jitter=0.3, pointpos=-1.8, marker_color=px.colors.qualitative.Plotly[i%10]))
 fig.update_layout(title_text='Boxplot of relative performances of the models', title_x=0.5, showlegend=False)
+fig.update_traces(boxmean=True)
 # Line size, point size and opacity
 # fig.write_html(pathhtml+'resultsBoxplot.html')
 # fig.update_layout(layout)
@@ -55,6 +56,7 @@ for i, col in enumerate(Dfeas.columns):
     if col not in ['pf','dc','vehicle_id']:
         fig.add_trace(go.Box(y=Dfeas[col], name=col, boxpoints='all', jitter=0.3, pointpos=-1.8, marker_color=px.colors.qualitative.Plotly[i%10]))
 fig.update_layout(title_text='Boxplot of relative performances of the models (only strictly feasible solutions)', title_x=0.5)
+fig.update_traces(boxmean=True)
 fig.show()
 
 # Calculate two-sample PAIRED t-test for each model pair and write nicely in an pandas dataframe

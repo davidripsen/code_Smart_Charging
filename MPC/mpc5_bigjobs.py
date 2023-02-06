@@ -140,7 +140,7 @@ for i in range(len(DFV)):
         
         ### Historic Montas Smart Charges
         prob_msc, x, b = MontasSmartCharge(dfv, u, z, L, b0, r, c_tilde)
-        plot_EMPC(prob_msc, 'Montas Smart Charge (r-corrected b[t]) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id, SOCorg=dfv['SOC'])
+        plot_EMPC(prob_msc, 'Montas Smart Charge (r-corrected b[t]) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=False, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id, SOCorg=dfv['SOC'])
         results['hist'][i] = round(value(prob_msc['objective']),2)
         infeasibles['hist'][i] = '  '# if LpStatus[prob_msc.status] == 'Optimal' else ' x '
 
