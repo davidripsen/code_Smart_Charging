@@ -10,8 +10,14 @@ import scipy.stats as stats
 sns.set_theme()
 pio.renderers.default = "browser"
 pd.set_option('display.max_rows', 200)
+layout = dict(font=dict(family='Computer Modern',size=11),
+              margin=dict(l=5, r=5, t=30, b=5),
+              width=605, height= 250,
+              title_x = 0.5)
+path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/Results/'
+pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
-folder = '30-01-2023__15h_40m_18s'
+folder = '27-01-2023__15h_45m_14s'
 D = pd.read_csv('results/'+folder+'/relativePerformances.csv')
 D = D[D != ' - ']
 #D = D.dropna()
@@ -24,10 +30,9 @@ Dres.columns = [col.replace('obj_','') for col in Dres.columns]
 I = pd.read_csv('results/'+folder+'/infeasibles.csv')
 Dfeas = D[I != ' x '].dropna() # Drop infeasible solutions
 
-# Summary statistics
+# Summary statisticso
 round(D.describe(),2)
 round(D.median(),2)
-
 round(Dfeas.describe(),2)
 
 
@@ -36,7 +41,12 @@ fig = go.Figure()
 for i, col in enumerate(D.columns):
     if col not in ['pf','dc','vehicle_id']:
         fig.add_trace(go.Box(y=D[col], name=col, boxpoints='all', jitter=0.3, pointpos=-1.8, marker_color=px.colors.qualitative.Plotly[i%10]))
-fig.update_layout(title_text='Boxplot of relative performances of the models', title_x=0.5)
+fig.update_layout(title_text='Boxplot of relative performances of the models', title_x=0.5, showlegend=False)
+# Line size, point size and opacity
+# fig.write_html(pathhtml+'resultsBoxplot.html')
+# fig.update_layout(layout)
+# fig.update_traces(boxmean=True, line_width=1, marker_size=2)
+# fig.write_image(path+'resultsBoxplot.pdf')
 fig.show()
 
 # Repeat for only strictly feasible solutions

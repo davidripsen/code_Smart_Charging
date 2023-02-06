@@ -432,7 +432,7 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
 
             u_forecast = np.repeat(uhat[k], h+1) # = actually uhat[k-1], but a 0 has been appended as first value.
             if perfectForesight:
-                u_forecast = u[tvec_i]
+                u_forecast = u[tvec_i]  
             u_t_true = u[k]
             
             assert len(c_forecast) >= 12, "c_forecast too short"
