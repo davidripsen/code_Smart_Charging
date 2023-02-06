@@ -50,7 +50,6 @@ def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u_t_true, u_forecast, z
     x = LpVariable.dicts("x", tvec, lowBound=0, upBound=xmax, cat='Continuous')
     b = LpVariable.dicts("b", np.append(tvec,T+1), lowBound=0, upBound=5000, cat='Continuous')
     s = LpVariable.dicts("s", tvec, lowBound=0, upBound=0.25*bmax, cat='Continuous') # Add penalizing slack for violating bmax=80%, but still remain below 100%
-    #s2 = LpVariable.dicts("s2", np.append(tvec,T+1), lowBound=0, upBound=list(bmin), cat='Continuous') # Add penalizing slack for violating bmin, but still remain above 0%
     s2 = {i: LpVariable("s2_"+str(i), lowBound=0, upBound=ub) for i, ub in enumerate(bmin)}
     b[0] = b0; #s2[0] = 0;
 
@@ -80,7 +79,6 @@ def ImperfectForesight(b0, bmax, bmin, xmax, c, c_tilde, u_t_true, u_forecast, z
 
 
 def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, z=np.nan, starttime='', endtime='', export=False, export_only = False, BatteryCap=60, firsthour=0, vehicle_id='', SOCorg=None):
-        # Identify iterative-appended, self-made prob
     fig = go.Figure()
     if type(prob) == dict:
         tvec = np.arange(0, len(prob['x']))
@@ -106,11 +104,8 @@ def plot_EMPC(prob, name="", x=np.nan, b=np.nan, u=np.nan, c=np.nan, z=np.nan, s
     
     fig.update_xaxes(tickvals=tvec_b[::24]+firsthour, ticktext=[str(t//24) for t in tvec_b[::24]+firsthour])
 
-    # Fix y-axis to lie between 0 and 65
     fig.update_yaxes(range=[-3, BatteryCap+2])
 
-    # add "Days" to x-axis
-    # Add total cost to title
     fig.update_layout(title=name + "    from " + starttime +" to "+ endtime+"      Total cost: " + str(round(obj)) + " DKK  (+tariffs)",
         xaxis_title="Days",
         yaxis_title="kWh  or  DKK/kWh  or  Plugged-in [T/F]")
@@ -238,13 +233,12 @@ def StochasticProgram(n_scenarios, b0, bmax, bmin, xmax, c_d, c_s, c_tilde, u_t_
         prob.solve(PULP_CBC_CMD(msg=0, warmStart= (previous_solution != None)))
         print("Status:", LpStatus[prob.status])
 
-    #Update b1 with actual use (relative to what we chose to charge) (Should be sufficient only to update b(1,0))
+    # Update b1 with actual use (relative to what we chose to charge) (Should be sufficient only to update b(1,0))
     for o in range(O):
         b[(1,o)] = b[(0,o)] + value(x_d[0])*r - u_t_true
         prob.assignVarsVals({'b_(1,_'+str(o)+')': b[1,o]})
         assert b[1,o] == value(b[1,0]), "b(1,o) is not equal to value(b(1,0))"
-        # ^ Most of this loop code is redundant
-
+        
     # Return results
     return(prob, x_d, b, x_s)
 
@@ -262,11 +256,9 @@ def getMediods(scenarios, n_clusters):
 
 # Maintained here
 def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, verbose=False):
-    
     # Study from first hour of prediciton up to and including the latest hour of known spot price
-    L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
+    L = len(u) - (maxh+1)
     H = h; # Store h
-    # perfectForesight = False
 
     # Init
     flag_AllFeasible = True
