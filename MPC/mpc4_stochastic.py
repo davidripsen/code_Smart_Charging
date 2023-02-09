@@ -32,11 +32,11 @@ with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
 
 R = []
 # Ids of interest
-idsOfInterest = [25701] #[1601, 30299, 6817, 18908] # Ids where perfect foresight fails
+idsOfInterest = [853] #[1601, 30299, 6817, 18908] # Ids where perfect foresight fails
 for i in range(len(DFV)):
     # i=2 Good performance (from stochastic model), i=3: Shitty performance
-    dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan', u_var='use_lin',
-                                                                                                                                                    uhat_var='use_org_rolling', bmin_var='SOCmin', p=0.10)
+    dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
+                                                                                                                                                    uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
     R.append(r)
     if vehicle_id not in idsOfInterest:
         continue
@@ -264,7 +264,7 @@ for i in range(len(DFV)):
 
     ### Run the problem
     h = 4*24 # 5 days horizon for the multi-day smart charge
-    n_scenarios = 10
+    n_scenarios = 20
     prob, x, b, flagFeasible = MultiDayStochastic(scenarios_all, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh = 6*24)
     plot_EMPC(prob, 'Stochastic Multi-Day Smart Charge (h = '+str(int(h/24))+' days)  of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
@@ -310,7 +310,7 @@ for i in range(len(DFV)):
 
         # ### DumbCharge
         prob_dc, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r, verbose=False)
-        plot_EMPC(prob_dc, 'Dumb Charge   of vehicle = ' + str(vehicle_id) + '   r = '+str(r), x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
+        plot_EMPC(prob_dc, 'Dumb Charge   of vehicle = ' + str(vehicle_id) + '   r = '+str(round(r,2)), x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=False, BatteryCap=bmax, firsthour=firsthour)
 
         # Montas Historical Smart Charges
         prob_msc, x, b = MontasSmartCharge(dfv, u, z, L, b0, r, c_tilde)

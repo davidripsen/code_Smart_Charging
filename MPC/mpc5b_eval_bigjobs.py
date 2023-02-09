@@ -68,3 +68,12 @@ for i, col1 in enumerate(Dres.columns):
                 if i<j:
                     ttest.loc[len(ttest)] = [col1, col2, stats.ttest_rel(Dres[col1], Dres[col2])[0], stats.ttest_rel(Dres[col1], Dres[col2])[1]]
 round(ttest,3)
+
+# Make histogram of the values from each model using plotly. Give them distinct colors.
+fig = go.Figure()
+for i, col in enumerate(D.columns):
+    if col not in ['pf','dc','vehicle_id']:
+        fig.add_trace(go.Histogram(x=D[col], name=col, marker_color=px.colors.qualitative.Plotly[i%10]))
+fig.update_layout(title_text='Histogram of relative performances of the models', title_x=0.5, showlegend=False)
+fig.update_traces(boxmean=True)
+fig.show()

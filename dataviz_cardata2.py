@@ -506,7 +506,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
 ## Export plots for report
 #dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13923, plot_efficiency_and_SOCmin=True, vertical_hover=False, layout=layout, imgtitle="use_curves_id")
 
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=10885, plot_efficiency_and_SOCmin=True, vertical_hover=False)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=853, plot_efficiency_and_SOCmin=True, vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[99], vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, plot_efficiency_and_SOCmin=True, vertical_hover=False, df_only=False)
 # Drop variables in dfv
