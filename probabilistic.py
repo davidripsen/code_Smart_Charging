@@ -125,6 +125,12 @@ cov = np.cov(df, rowvar=False)
 cov = dfr.iloc[:,3:maxstep+3].cov()
     # "the sample covariance matrix was singular which can happen from exactly collinearity (as you've said) or when the number of observations is less than the number of variables."
 
+# Shrinking the covariance matrix
+def ShrinkCov(alpha):
+    return (1-alpha) * cov + alpha * np.diag(np.diag(cov))
+    # alpha = 0: no shrinkage
+    # alpha = 1: shrinkage to the identity matrix
+
 # Visualise mu (and therefore bias)
 if plot:
     fig = go.Figure()
@@ -139,26 +145,32 @@ if plot:
     #
 
 # Visualise covariance matrix
-if plot:
-    fig = go.Figure(data=go.Heatmap(
-            z=cov,
-            x=np.arange(maxstep),#cov.columns,
-            y=np.arange(maxstep),#cov.columns,
-            colorscale='Viridis'))
-    fig.update_layout(title='Covariance matrix of residuals per timestep', xaxis_title='Timestep', yaxis_title='Timestep')
-    # Center title
-    fig.update_layout(showlegend=False)
-    #fig.write_html(pathhtml + "/Covariance_matrix_of_residuals_Carnot.html")
-    fig.show()
-    fig.update_layout(layout)
-    #fig.write_image(path + "/Covariance_matrix_of_residuals_Carnot.pdf")
+# Chosose covariance matrix
+alpha=0.1
+for alpha in np.arange(0.01, 1, 0.01):
+    Sigma = ShrinkCov(alpha) # Sigma = cov = ShrinkCov(0)  for no shrinkage / sample cov
+    if plot:
+        fig = go.Figure(data=go.Heatmap(
+                z=Sigma,
+                x=np.arange(maxstep),#cov.columns,
+                y=np.arange(maxstep),#cov.columns,
+                colorscale='Viridis'))
+        fig.update_layout(title='Covariance matrix of residuals per timestep '+'(lambda = '+(str(alpha)) +')', xaxis_title='Timestep', yaxis_title='Timestep')
+        # Center title
+        fig.update_layout(showlegend=False)
+        #fig.write_html(pathhtml + "/Covariance_matrix_of_residuals_Carnot.html")
+        fig.show()
+        fig.update_layout(layout)
+        #fig.write_image(path + "/Covariance_matrix_of_residuals_Carnot.pdf")
 
-
-# Generate 100 samples from the multivariate normal distribution
-samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 20000)
-print(samples.shape)
-# Export samples to csv
-np.savetxt("./data/MPC-ready/scenarios.csv", samples, delimiter=",")
+alphas = [0.15, 0.25, 0.4, 1]
+for alpha in alphas:
+    cov=ShrinkCov(alpha)    
+    # Generate 100 samples from the multivariate normal distribution
+    samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 20000)
+    print(samples.shape)
+    # Export samples to csv
+    np.savetxt(f"./data/MPC-ready/scenarios_shrunk_alpha={alpha}.csv", samples, delimiter=",")
 
 
 # Visualise the time series of the samples and add 95 % prediction interval

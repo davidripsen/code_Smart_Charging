@@ -50,7 +50,7 @@ horizons = [4]
 models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for h in horizons]
 
 # n_clusters  (= n_scenarios)
-n_clusters=20
+n_clusters=10
 
 # Read scenarios from txt
 scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenarios_all=scenarios;
@@ -60,7 +60,7 @@ with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
     DFV = pickle.load(f)
 
 # Flip order of DFV list
-#DFV = DFV[::-1]
+DFV = DFV[::-1]
 
 # Init bookkeeping of results add index from 0 to 99
 results = pd.DataFrame(columns=[model for model in models]+ ['vehicle_id'], index=range(len(DFV)))
@@ -89,11 +89,11 @@ for i in range(len(DFV)):
         plot_EMPC(prob_stoch, 'Stochastic Smart Charge (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=True, firsthour=firsthour, vehicle_id=vehicle_id)
 
         # # Stochastic with kMediods
-        mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
-        prob_stochKM, x, b, flagFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, KMweights=weights)
-        results['stochKM'+str(h)][i] = round(prob_stochKM['objective'],2)
-        infeasibles['stochKM'+str(h)][i] = '  ' if flagFeasible_stochKM else ' x '
-        plot_EMPC(prob_stochKM, 'Stochastic-kMediods SC (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=True, firsthour=firsthour, vehicle_id=vehicle_id)
+        # mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
+        # prob_stochKM, x, b, flagFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, KMweights=weights)
+        # results['stochKM'+str(h)][i] = round(prob_stochKM['objective'],2)
+        # infeasibles['stochKM'+str(h)][i] = '  ' if flagFeasible_stochKM else ' x '
+        # plot_EMPC(prob_stochKM, 'Stochastic-kMediods SC (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=True, firsthour=firsthour, vehicle_id=vehicle_id)
 
         if runDeterministicReference:
             ### Multi-Dayahead (Deterministic)
@@ -135,12 +135,12 @@ for i in range(len(DFV)):
         prob_dc, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r, verbose=False)
         flagFeasible_dc = LpStatus[prob_dc.status] == 'Optimal'
         plot_EMPC(prob_dc, 'Dumb Charge of vehicle = ' + str(vehicle_id) + ' (r = '+str(round(r,2))+')', x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
-        results['dc'][i] = round(value(prob_dc.objective),2)
+        results['dc'][i] =  round(value(prob_dc.objective),2)
         infeasibles['dc'][i] = '  ' if flagFeasible_dc else ' x '
         
         ### Historic Montas Smart Charges
         prob_msc, x, b = MontasSmartCharge(dfv, u, z, L, b0, r, c_tilde)
-        plot_EMPC(prob_msc, 'Montas Smart Charge (dif. plug-in) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=False, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id, SOCorg=dfv['SOC'])
+        plot_EMPC(prob_msc, 'Montas Smart Charge (dif. plug-in) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id, SOCorg=dfv['SOC'])
         results['hist'][i] = round(value(prob_msc['objective']),2)
         infeasibles['hist'][i] = '  '# if LpStatus[prob_msc.status] == 'Optimal' else ' x '
 
