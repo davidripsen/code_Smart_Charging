@@ -95,3 +95,5 @@ fig.write_html(pathhtml+'infeasibles.html')
 fig.update_layout(layout)
 fig.write_image(path+'infeasibles.pdf')
 fig.show()
+
+(I.da== 1).mean()
