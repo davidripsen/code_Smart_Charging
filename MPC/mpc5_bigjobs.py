@@ -23,8 +23,8 @@ np.random.seed(2812)
 
 # Choosedddd
 runDeterministicReference = True
-NOTE = 'Normal' # Optional message to output folder
-print(NOTE)
+NOTE = 'shrinkage lambda = 0.25, c_tilde = quantile(p=0.25)' # Optional message to output folder
+print(NOTE) 
 
 # Save results, note and copy of code
 os.mkdir('results/'+nowstring)
@@ -53,7 +53,7 @@ models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for 
 n_clusters=10
 
 # Read scenarios from txt
-scenarios = np.loadtxt('./data/MPC-ready/scenarios.csv', delimiter=','); scenarios_all=scenarios;
+scenarios = np.loadtxt('./data/MPC-ready/scenarios_shrunk_alpha=0.25.csv', delimiter=','); scenarios_all=scenarios;
 
 # Load pickle file from data/MPC-ready
 with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
@@ -72,7 +72,7 @@ absolutePerformances = pd.DataFrame(columns=[model for model in models]+ ['vehic
 for i in range(len(DFV)):
     #i = 0 # i=2 Good performance (from stochastic model), i=3: Shitty performance
     dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
-                                                                                                                                                    uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10) # (dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',                                                                                                                                                                                                                   # uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
+                                                                                                                                                    uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.25) # (dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',                                                                                                                                                                                                                   # uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
     print('Vehicle ID = ', vehicle_id, ' (', i, '/', len(DFV)-1, ')')
     results['vehicle_id'][i] = vehicle_id
     infeasibles['vehicle_id'][i] = vehicle_id
