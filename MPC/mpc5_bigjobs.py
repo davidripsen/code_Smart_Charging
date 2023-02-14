@@ -23,7 +23,7 @@ np.random.seed(2812)
 
 # Choosedddd
 runDeterministicReference = True
-NOTE = 'shrinkage lambda = 0.25, c_tilde = quantile(p=0.25)' # Optional message to output folder
+NOTE =  'h=1.5 days. Stoch should be ≈ da  -  shrinkage lambda = 0.25, c_tilde = quantile(p=0.25)' # Optional message to output folder
 print(NOTE) 
 
 # Save results, note and copy of code
@@ -46,7 +46,7 @@ AbsolutePerformance = lambda x, dc:       dc-x
 # Models
 models_h = ['stoch', 'mda'] #['stochKM', 'stoch', 'mda']
 models_plain = ['da', 'pf', 'dc', 'hist'] # hist = historic charging using Montas Smart Charging
-horizons = [4]
+horizons = [1.5]
 models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for h in horizons]
 
 # n_clusters  (= n_scenarios)
@@ -95,13 +95,13 @@ for i in range(len(DFV)):
         # infeasibles['stochKM'+str(h)][i] = '  ' if flagFeasible_stochKM else ' x '
         # plot_EMPC(prob_stochKM, 'Stochastic-kMediods SC (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=True, firsthour=firsthour, vehicle_id=vehicle_id)
 
-        if runDeterministicReference:
-            ### Multi-Dayahead (Deterministic)
-            # #h = 4*24 # 5 days horizon for the multi-day smart charge
-            prob_mda, x, b, flagFeasible_mda = MultiDay(dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=False)
-            results['mda'+str(h)][i] = round(prob_mda['objective'],2)
-            infeasibles['mda'+str(h)][i] = '  ' if flagFeasible_mda else ' x '
-            plot_EMPC(prob_mda, 'Multi-Day Smart Charge (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
+        # if runDeterministicReference:
+        #     ### Multi-Dayahead (Deterministic)
+        #     # #h = 4*24 # 5 days horizon for the multi-day smart charge
+        #     prob_mda, x, b, flagFeasible_mda = MultiDay(dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=False)
+        #     results['mda'+str(h)][i] = round(prob_mda['objective'],2)
+        #     infeasibles['mda'+str(h)][i] = '  ' if flagFeasible_mda else ' x '
+        #     plot_EMPC(prob_mda, 'Multi-Day Smart Charge (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=True, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
 
 
     if runDeterministicReference:

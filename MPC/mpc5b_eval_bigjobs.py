@@ -17,8 +17,8 @@ layout = dict(font=dict(family='Computer Modern',size=11),
 path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/Results/'
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
-folder = '27-01-2023__15h_45m_14s' # '12-02-2023__15h_01m_07s'
-D = pd.read_csv('results/'+folder+'/relativePerformances.csv')
+folder = '12-02-2023__15h_01m_07s'
+D = pd.read_csv('results/'+folder+'/results.csv')
 D = D[D != ' - ']
 #D = D.dropna()
 D = D.astype(float)
@@ -44,13 +44,12 @@ for i, col in enumerate(D.columns):
         fig.add_trace(go.Box(y=D[col], name=col, boxpoints='all', jitter=0.3, pointpos=-1.8, marker_color=px.colors.qualitative.Plotly[i%10]))
 fig.update_layout(title_text='Boxplot of relative performances of the models', title_x=0.5, showlegend=False)
 fig.update_traces(boxmean=True)
-fig.show()
-# Line size, point size and opacity
-# fig.update_traces(boxmean=True)
-# fig.write_html(pathhtml+'resultsBoxplot.html')
-# fig.update_layout(layout)
-# fig.update_traces(line_width=1, marker_size=2)
-# fig.write_image(path+'resultsBoxplot.pdf')
+#fig.show()
+fig.update_traces(boxmean=True)
+fig.write_html(pathhtml+'resultsBoxplot2.html')
+fig.update_layout(layout)
+fig.update_traces(line_width=1, marker_size=2)
+fig.write_image(path+'resultsBoxplot2.pdf')
 
 
 # Repeat for only strictly feasible solutions
