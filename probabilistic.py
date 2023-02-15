@@ -163,7 +163,7 @@ for alpha in np.arange(0.01, 1, 0.01):
         fig.update_layout(layout)
         #fig.write_image(path + "/Covariance_matrix_of_residuals_Carnot.pdf")
 
-alphas = [0.15, 0.25, 0.4, 1]
+alphas = [0.10, 0.20, 0.30, 0.40]
 for alpha in alphas:
     cov=ShrinkCov(alpha)    
     # Generate 100 samples from the multivariate normal distribution
