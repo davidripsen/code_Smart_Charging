@@ -23,7 +23,7 @@ np.random.seed(2812)
 
 # Choosedddd
 runDeterministicReference = True
-NOTE =  'h=1.5 days. Stoch should be ≈ da  -  shrinkage lambda = 0.25, c_tilde = quantile(p=0.25)' # Optional message to output folder
+NOTE =  'GridSearch: shrinkage = 0.10, c_tilde = quantiles(p=0.10)' # Optional message to output folder
 print(NOTE) 
 
 # Save results, note and copy of code
@@ -46,7 +46,7 @@ AbsolutePerformance = lambda x, dc:       dc-x
 # Models
 models_h = ['stoch', 'mda'] #['stochKM', 'stoch', 'mda']
 models_plain = ['da', 'pf', 'dc', 'hist'] # hist = historic charging using Montas Smart Charging
-horizons = [1.5]
+horizons = [3, 4, 5, 6]
 models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for h in horizons]
 
 # n_clusters  (= n_scenarios)
