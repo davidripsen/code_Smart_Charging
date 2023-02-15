@@ -17,47 +17,50 @@ layout = dict(font=dict(family='Computer Modern',size=11),
 path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/Results/'
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
-folder = '12-02-2023__15h_01m_07s'
+folder = '13-02-2023__18h_40m_16s'
 D = pd.read_csv('results/'+folder+'/results.csv')
 D = D[D != ' - ']
 #D = D.dropna()
 D = D.astype(float)
+# Read txt file Note
+with open('results/'+folder+'/NOTE.txt', 'r') as file:
+    note = file.read()
 Dres = pd.read_csv('results/'+folder+'/results.csv')
 Dres = Dres[Dres != ' - ']
-Dres = Dres.dropna()
+#Dres = Dres.dropna()
 Dres = Dres.astype(float)
 Dres.columns = [col.replace('obj_','') for col in Dres.columns]
 I = pd.read_csv('results/'+folder+'/infeasibles.csv')
-Dfeas = D[I != ' x '].dropna() # Drop infeasible solutions
+Dfeas = D[I != ' x ']#.dropna() # Drop infeasible solutions
 
 # Summary statisticso
 round(D.describe(),2)
 round(D.median(),2)
 round(Dfeas.describe(),2)
 
-D['diff'] = D['stoch4'] - D['da']
+#D['diff'] = D['stoch4'] - D['da']
 
 # Make a boxplot of the values from each model using plotly. Give them distinct colors.
 fig = go.Figure()
 for i, col in enumerate(D.columns):
     if col not in ['pf','dc','vehicle_id']:
         fig.add_trace(go.Box(y=D[col], name=col, boxpoints='all', jitter=0.3, pointpos=-1.8, marker_color=px.colors.qualitative.Plotly[i%10]))
-fig.update_layout(title_text='Boxplot of relative performances of the models', title_x=0.5, showlegend=False)
+fig.update_layout(title_text='Boxplot of relative performances of the models ('+note+')', title_x=0.5, showlegend=False)
 fig.update_traces(boxmean=True)
-#fig.show()
-fig.update_traces(boxmean=True)
-fig.write_html(pathhtml+'resultsBoxplot2.html')
-fig.update_layout(layout)
-fig.update_traces(line_width=1, marker_size=2)
-fig.write_image(path+'resultsBoxplot2.pdf')
+fig.show()
+# fig.update_traces(boxmean=True)
+# fig.write_html(pathhtml+'resultsBoxplot.html')
+# fig.update_layout(layout)
+# fig.update_traces(line_width=1, marker_size=2)
+# fig.write_image(path+'resultsBoxplot.pdf')
 
 
 # Repeat for only strictly feasible solutions
 fig = go.Figure()
 for i, col in enumerate(Dfeas.columns):
-    if col not in ['pf','dc','vehicle_id']:
+    if col not in ['pf','dc','vehicle_id', 'mda6']:
         fig.add_trace(go.Box(y=Dfeas[col], name=col, boxpoints='all', jitter=0.3, pointpos=-1.8, marker_color=px.colors.qualitative.Plotly[i%10]))
-fig.update_layout(title_text='Boxplot of relative performances of the models (only strictly feasible solutions)', title_x=0.5)
+fig.update_layout(title_text='Boxplot of relative performances of the models (only strictly feasible solutions) ('+note+')', title_x=0.5)
 fig.update_traces(boxmean=True)
 fig.show()
 
