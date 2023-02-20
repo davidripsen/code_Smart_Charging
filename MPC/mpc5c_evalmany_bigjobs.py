@@ -32,14 +32,22 @@ folders = ['15-02-2023__17h_06m_54s',
     '15-02-2023__17h_04m_40s',
     '15-02-2023__17h_04m_31s',
     '15-02-2023__17h_04m_25s',
-    '15-02-2023__17h_04m_19s']
+    '15-02-2023__17h_04m_19s',
+    '16-02-2023__17h_23m_19s',
+    '16-02-2023__17h_23m_39s',
+    '16-02-2023__17h_24m_12s',
+    '16-02-2023__17h_24m_49s',
+    '16-02-2023__17h_25m_00s',
+    '16-02-2023__17h_25m_10s',
+    '16-02-2023__17h_25m_18s',
+    '16-02-2023__17h_25m_25s']
 
 # Store mean and median of each model of each foldername/job
 RESULTS = pd.DataFrame(columns=['model','mean', 'median', 'std'])
 
 for folder in folders:
     folder = folder #'13-02-2023__18h_40m_16s'
-    D = pd.read_csv('results/'+folder+'/relativePerformances.csv')
+    D = pd.read_csv('results/'+folder+'/results.csv')
     D = D[D != ' - ']
     #D = D.dropna()
     D = D.astype(float)
@@ -137,9 +145,9 @@ fig.show()
 # Analyse Grid Search RESULTS
 
 # Which are the 5 best models?
-RESULTS.sort_values(by='mean', ascending=True).head(20)
+RESULTS.sort_values(by='mean', ascending=True).head(100)
     # Stoch: h = 3, lambda = 0.3, p=0.4
     # DA: p=0.3
-    # MDA: ???
+    # MDA: h=3, lambda=0.2, p=0.4
 
     # NOW: READ NEW FORECASTS
