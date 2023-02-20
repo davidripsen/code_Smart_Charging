@@ -4,7 +4,7 @@ In this repository you will find all the code and models for the Masters Thesis 
 Checkout [visualisations](https://davidripsen.github.io/code_Smart_Charging/) to see some of the results.
 
 ## Code
-The main code is located in ´MPC/FunctionCollection.py´
+The most important implementations is located in the `MPC/`-folder, particularly `MPC/FunctionCollection.py`.
 
 ## Figures
 [1](https://davidripsen.github.io/code_Smart_Charging/_figures/spotprices)
@@ -39,7 +39,7 @@ A key aspect of transitioning to weather-driven energy sources is utilising the 
 
 It turns out that the Smart Charging problem can be modelled by a linear program which is very fast to solve. For controlling the charging optimally over time, \textit{Model Predictive Control} is suggested for solving the linear program with a \textit{receding horizon} of up to 6 days of length. When considering the next six days in determining how much to charge \textit{here-and-now}, one will need to predict the expected usage, plug-in hours and price. For the latter, open-source forecast is utilised. For the former, EV behavioural data has been provided by \href{www.monta.com}{Monta}.
 
-%Throughout the thesis, both deterministic and stochastic models are developed to model the Smart Charging problem.
+Throughout the thesis, both deterministic and stochastic models are developed to model the Smart Charging problem.
 For comparison of various models, a novel measure is proposed: \textit{Relative Total Cost}, which defines the relative difference from the total costs of having Perfect Foresight relative to \textit{Dumb Charging}, charging immediately upon plug-in. All other models are assessed in this range from 0 \% to 100 \%.
 
 Both deterministic and stochastic models are developed. The deterministic models assume the price forecasts to be true. This proves to fool the models into taking worse decisions, thereby increasing cost with the increasing horizon. To model the uncertainty of the price forecasts, stochastic models are introduced. They are based on building a probabilistic forecast head on top of the external point forecast, from which statistical scenarios of the price residuals can be sampled. By defining the two-stage stochastic program of the problem, the model learns that forecasts are inherently uncertain and proves to improve performance relative to the deterministic models.
