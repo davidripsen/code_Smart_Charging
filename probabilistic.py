@@ -126,7 +126,7 @@ cov = dfr.iloc[:,3:maxstep+3].cov()
     # "the sample covariance matrix was singular which can happen from exactly collinearity (as you've said) or when the number of observations is less than the number of variables."
 
 # Shrinking the covariance matrix
-def ShrinkCov(alpha):
+def ShrinkCov(alpha, cov):
     return (1-alpha) * cov + alpha * np.diag(np.diag(cov))
     # alpha = 0: no shrinkage
     # alpha = 1: shrinkage to the identity matrix
@@ -144,30 +144,36 @@ if plot:
     fig.write_image(path + "/Mean_of_residuals_per_timestep_Carnot.pdf")
     #
 
-# Visualise covariance matrix
-# Chosose covariance matrix
-alpha=0.1
-for alpha in np.arange(0.01, 1, 0.01):
-    Sigma = ShrinkCov(alpha) # Sigma = cov = ShrinkCov(0)  for no shrinkage / sample cov
-    if plot:
-        fig = go.Figure(data=go.Heatmap(
-                z=Sigma,
-                x=np.arange(maxstep),#cov.columns,
-                y=np.arange(maxstep),#cov.columns,
-                colorscale='Viridis'))
-        fig.update_layout(title='Covariance matrix of residuals per timestep '+'(lambda = '+(str(alpha)) +')', xaxis_title='Timestep', yaxis_title='Timestep')
-        # Center title
-        fig.update_layout(showlegend=False)
-        #fig.write_html(pathhtml + "/Covariance_matrix_of_residuals_Carnot.html")
-        fig.show()
-        fig.update_layout(layout)
-        #fig.write_image(path + "/Covariance_matrix_of_residuals_Carnot.pdf")
+# Make the above plots into a 2 x 1 plot
+from plotly.subplots import make_subplots
+Sigma = ShrinkCov(0, cov)
+Sigma_shrink = ShrinkCov(0.3, cov)
+fig = make_subplots(rows=1, cols=2, shared_xaxes=True, vertical_spacing=0.1, shared_yaxes=True)
+fig.add_trace(go.Heatmap(
+            z=Sigma,
+            x=np.arange(maxstep),#cov.columns,
+            y=np.arange(maxstep),#cov.columns,
+            colorscale='Viridis',zmin=0,zmax=2), row=1, col=1)
+fig.update_layout(showlegend=False)
+fig.add_trace(go.Heatmap(
+            z=Sigma_shrink,
+            x=np.arange(maxstep),#cov.columns,
+            y=np.arange(maxstep),#cov.columns,
+            colorscale='Viridis',zmin=0,zmax=2), row=1, col=2)
+# Set legend range plotly
+fig.update_layout(title='Sample covariance matrix of residuals (left) and shrinked covariance matrix (right)')
+fig.update_xaxes(title_text="Timestep", row=2, col=1)
+fig.update_yaxes(title_text="Timestep", row=1, col=1)
+fig.write_html(pathhtml + "/Covariance_matrix_of_residuals_Carnot.html")
+fig.update_layout(layout)
+fig.write_image(path + "/Covariance_matrix_of_residuals_Carnot.pdf")
+fig.show()
 
 alphas = [0.10, 0.20, 0.30, 0.40]
 for alpha in alphas:
-    cov=ShrinkCov(alpha)    
+    COV=ShrinkCov(alpha, cov)    
     # Generate 100 samples from the multivariate normal distribution
-    samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 20000)
+    samples = np.random.multivariate_normal(mu.to_numpy(), COV.to_numpy(), 20000)
     print(samples.shape)
     # Export samples to csv
     np.savetxt(f"./data/MPC-ready/scenarios_shrunk_alpha={alpha}.csv", samples, delimiter=",")
@@ -175,21 +181,21 @@ for alpha in alphas:
 
 # Visualise the time series of the samples and add 95 % prediction interval
 if plot:
-    samples = np.random.multivariate_normal(mu.to_numpy(), cov.to_numpy(), 20000)
+    samples = np.random.multivariate_normal(mu.to_numpy(), COV.to_numpy(), 20000)
     fig = go.Figure()
     # Add theoretical mean
-    fig.add_trace(go.Scatter(x=mu.index, y=mu.values, mode='lines', name='Mean', line=dict(color='black', width=1)))
+    # Calculate emperical 95 % quantiles from samples
+    #quantiles = np.quantile(samples, [0.025, 0.975], axis=0)
+    #fig.add_trace(go.Scatter(x=mu.index, y=quantiles[0,:], mode='lines', name='97.5% quantile', line=dict(width=1, color='red', dash='dash')))
+    #fig.add_trace(go.Scatter(x=mu.index, y=quantiles[1,:], mode='lines', name='2.5% quantile', line=dict(width=1, color='red', dash='dash')))
+    for i in range(0,10):
+        fig.add_trace(go.Scatter
+            (x=mu.index, y=samples[i,:], mode='lines', name="Sample "+str(i), line=dict(width=1)))
+    fig.update_layout(title='Statistical scenarios sampled from the multivariate normal distribution', xaxis_title='Timestep', yaxis_title='Residual')
     # Add 95% confidence interval
     fig.add_trace(go.Scatter(x=mu.index, y=mu.values+1.96*np.sqrt(np.diag(cov)), mode='lines', name='97.5% CI (Wald)', line=dict(width=1, color='red')))
     fig.add_trace(go.Scatter(x=mu.index, y=mu.values-1.96*np.sqrt(np.diag(cov)), mode='lines', name='2.5% CI (Wald)', line=dict(width=1, color='red')))
-    # Calculate emperical 95 % quantiles from samples
-    quantiles = np.quantile(samples, [0.025, 0.975], axis=0)
-    fig.add_trace(go.Scatter(x=mu.index, y=quantiles[0,:], mode='lines', name='97.5% quantile', line=dict(width=1, color='red', dash='dash')))
-    fig.add_trace(go.Scatter(x=mu.index, y=quantiles[1,:], mode='lines', name='2.5% quantile', line=dict(width=1, color='red', dash='dash')))
-    for i in range(0,100):
-        fig.add_trace(go.Scatter
-            (x=mu.index, y=samples[i,:], mode='lines', name="Sample "+str(i), line=dict(width=0.5, color='gray')))
-    fig.update_layout(title='Statistical scenarios sampled from the multivariate normal distribution', xaxis_title='Timestep', yaxis_title='Residual')
+    fig.add_trace(go.Scatter(x=mu.index, y=mu.values, mode='lines', name='Mean', line=dict(color='black', width=1)))
     # Change legend to be horizontal below the plot
     fig.update_layout(legend=dict(
         orientation="h",
@@ -198,10 +204,12 @@ if plot:
         xanchor="right",
         x=1
     ))
+    fig.update_yaxes(range=[-3.2, 3.2])
     # Center title
     fig.write_html(pathhtml + "/Samples_from_multivariate_normal_distribution_Carnot.html")
     fig.show()
     fig.update_layout(layout)
+    fig.update_layout(showlegend=False)
     fig.write_image(path + "/Samples_from_multivariate_normal_distribution_Carnot.pdf")
 
     # = Prediction interval (under correct model assumption)
