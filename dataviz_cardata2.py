@@ -14,7 +14,7 @@ layout = dict(font=dict(family='Computer Modern',size=11),
               margin=dict(l=5, r=5, t=30, b=5),
               width=605, height= 250,
               title_x = 0.5,
-              legend=dict(orientation="h", yanchor="bottom", y=-.32, xanchor="right", x=1))
+              legend=dict(orientation="h", yanchor="bottom", y=-.40, xanchor="right", x=1)) # y=-.32
 path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/EV_Monta/Individual_EVs/'
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
@@ -297,41 +297,41 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         )
     ))
 
-    # fig.add_trace(go.Scatter(
-    # x=df.index,
-    # y=df['use_rolling'],
-    # mode='lines',
-    # name='Use ('+str(7)+' day rolling mean) [kWh]',
-    # line=dict(
-    #     color='red',
-    #     width=2,
-    #     dash='dot'
-    # )
-    # ))
+    fig.add_trace(go.Scatter(
+    x=df.index,
+    y=df['use_rolling'],
+    mode='lines',
+    name='Use ('+str(7)+' day rolling mean) [kWh]',
+    line=dict(
+        color='red',
+        width=2,
+        dash='dot'
+    )
+    ))
 
-    # fig.add_trace(go.Scatter(
-    # x=df.index,
-    # y=df['use_ewm'],
-    # mode='lines',
-    # name='Use (Exponentially Weighted Moving Average with half life = '+str(2)+') [kWh]',
-    # line=dict(
-    #     color='red',
-    #     width=2,
-    #     dash='dash'
-    # )
-    # ))
+    fig.add_trace(go.Scatter(
+    x=df.index,
+    y=df['use_ewm'],
+    mode='lines',
+    name='Use (Exponentially Weighted Moving Average with half life = '+str(2)+') [kWh]',
+    line=dict(
+        color='red',
+        width=2,
+        dash='dash'
+    )
+    ))
 
-    # fig.add_trace(go.Scatter(
-    #     x=df.index,
-    #     y=df['use_dailyaverage'],
-    #     mode='lines',
-    #     name='Use daily average (outside of plug-in) [kWh]',
-    #     line=dict(
-    #         color='red',
-    #         width=0.5,
-    #         dash='dash'
-    #     )
-    # ))
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df['use_dailyaverage'],
+        mode='lines',
+        name='Use daily average (outside of plug-in) [kWh]',
+        line=dict(
+            color='red',
+            width=0.5,
+            dash='dash'
+        )
+    ))
 
     fig.add_trace(go.Scatter(
         x=df.index,
@@ -475,10 +475,12 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         fig.update_layout(layout)
         # For the x-ticks, only show every 7th day
         fig.update_xaxes(
+            tickformat = '%b %d',
             tickmode = 'array',
             tickvals = [firsttime + datetime.timedelta(days=i) for i in range((lasttime-firsttime).days+1) if i%7==0],
-            ticktext = [str(firsttime + datetime.timedelta(days=i))[:10] for i in range((lasttime-firsttime).days+1) if i%7==0],
-            tickangle = 45
+            ticktext = [str((firsttime + datetime.timedelta(days=i)).strftime('%d/%m'))[:10] for i in range((lasttime-firsttime).days+1) if i%7==0],
+            tickangle = 0#45,
+            # Disregard the year from the x-axis tick labels
         )
         # Remove x-ticks and xaxis title text (TEMPORARY)
         # fig.update_xaxes(
@@ -506,9 +508,9 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
 ## Export plots for report
 #dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13923, plot_efficiency_and_SOCmin=True, vertical_hover=False, layout=layout, imgtitle="use_curves_id")
 
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, plot_efficiency_and_SOCmin=False, vertical_hover=False, df_only=False, imgtitle="PlainProfile_id", layout=layout)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=853, plot_efficiency_and_SOCmin=True, vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[99], vertical_hover=False)
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, plot_efficiency_and_SOCmin=True, vertical_hover=False, df_only=False)
 # Drop variables in dfv
 dfv = dfv.drop(['use_dailyaverage', 'use_rolling', 'use_ewm', 'efficiency'], axis=1)
 # Add index as the first column and reset index
@@ -519,6 +521,8 @@ dfv = dfv.drop(['use_dailyaverage', 'use_rolling', 'use_ewm', 'efficiency'], axi
 # print(round(dfv.iloc[:,[0,-1]],2).to_latex())
 # print(round(dfp.iloc[[0,1,2,3,4,5,-3,-2,-1],[0,1,2,3,4,5,6,-3,-2,-1]],2).to_latex())
 
+# Format timestamp to show only date
+dfv.index = dfv.index.strftime('%d/%d')
 
 ids = [30299, 6817, 18908] # Ids where perfect foresight fails
 for id in ids:
