@@ -203,10 +203,14 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
         # Issues: When subsetting on NOT plugged_in, the roll length of 7*24 steps becomes more than 7 days
         # Issues: Initial 7 days
 
-        # Calculate 14-day rolling mean of use (use to estimate use_lin. Without cheating)
+        # Calculate 10-day rolling mean of use (use to estimate use_lin. Without cheating)
         roll_length = 10
         df['use_org_rolling'] = df['use'].rolling(roll_length*24, min_periods=12).mean() # min periods shouldn't be too large or too small
         df['use_org_rolling'] = df['use_org_rolling'].fillna(0) # Estimate u_hat 12 hours with 0
+        # Repeat for other roll_lengths
+        for roll_length in [1, 3, 5, 7, 10, 14, 21]:
+            df[f'use_org_rolling_{str(roll_length)}'] = df['use'].rolling(roll_length*24, min_periods=12).mean()
+            df[f'use_org_rolling_{str(roll_length)}'] = df[f'use_org_rolling_{str(roll_length)}'].fillna(0)
 
         # Exponential moving average
         hlf_life = 2 # days

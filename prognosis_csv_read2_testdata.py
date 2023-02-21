@@ -31,7 +31,7 @@ plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Computer Modern Seri
 dfspot = pd.read_csv('data/spotprice/df_spot_since_sept22_HourDK.csv', sep=',', header=0, parse_dates=True)
 #dfc = pd.read_csv('data/forecastsCarnot/carnot_forecasts.csv', sep=',', head   er=0, parse_dates=True)
 #dfc = pd.read_csv('data/forecastsCarnot/carnot_forecasts2.csv', sep=',', header=0, parse_dates=True)
-dfc = pd.read_csv('data/forecastsCarnot/testdata/charges_optimization_thesis (1).csv', sep=',', header=0, parse_dates=True)
+dfc = pd.read_csv('data/forecastsCarnot/testdata/Spot_prices_dk2_extract.csv', sep=',', header=0, parse_dates=True)
 
 if use_carnot:
     #dfc = dfc[(dfc['SOURCE'] == 'carnot') & (dfc['COUNTRY_AREA_CODE'] == 'DK2')]
@@ -42,12 +42,15 @@ if use_carnot:
     # Subset on DK2
     dfc = dfc[(dfc['COUNTRY_AREA_CODE'] == 'DK2')].reset_index(drop=True)
 
-    df = pd.DataFrame({'Atime': dfc.CREATED_AT, 'Atime_org': dfc.CREATED_AT, 'Time': dfc.TIME_START, 'PredPrice': dfc.FORECAST_PRICE_KWH, 'TruePrice_Carnot': dfc.PRICE_KWH, 'Source': dfc.SOURCE})
+    df = pd.DataFrame({'Atime': dfc.CREATED_AT, 'Atime_org': dfc.CREATED_AT, 'Time': dfc.TIME_START, 'PredPrice': dfc.FORECAST_PRICE_KWH, 'Source': dfc.SOURCE})
 
     # Convert Atime and Time to datetime
     df['Atime'] = pd.to_datetime(df['Atime'], format='%Y-%m-%d %H:%M:%S')
     df['Atime_org'] = pd.to_datetime(df['Atime_org'], format='%Y-%m-%d %H:%M:%S')
     df['Time'] = pd.to_datetime(df['Time'], format='%Y-%m-%d %H:%M:%S')
+
+    # Sort df by Atime and reset index
+    df = df.sort_values(by=['Atime', 'Time']).reset_index(drop=True)
 
     # Ceil Atime to the next 5 minutes  
     #df['Atimec'] = df['Atime'].dt.ceil('10min')
@@ -71,7 +74,7 @@ if use_carnot:
     #df = df.dropna()
 
     # Cut away forecasts before 2022-11-01 and after 2023-01-02
-    df = df[df['Atime'] > '2022-10-30']
+    df = df[df['Atime'] > '2022-11-10 12:20:45']
 #   df = df[df['Atime'] < '2023-01-05'] # To do when hopefully more forecasts are comming
     horizons = df.Atime.value_counts()
     if plot_alot:
@@ -93,13 +96,13 @@ if use_carnot:
     print("Is there big gaps in Atime?")
     Atime_diff = pd.Series(df.Atime.unique()).diff().dt.seconds / 3600
     # histogram of Atime_diff
-    # if plot_alot:
-    #     plt.hist(Atime_diff, bins=100)
-    #     plt.title('Distribution of Atime differences')
-    #     plt.xlabel('Atime difference [h]')
-    #     plt.ylabel('Number of Atime differences')
+    if plot_alot:
+        plt.hist(Atime_diff, bins=100)
+        plt.title('Distribution of Atime differences')
+        plt.xlabel('Atime difference [h]')
+        plt.ylabel('Number of Atime differences')
         #plt.savefig('plots/Carnot/Atime_diff.pdf', bbox_inches='tight')
-        #plt.show()
+        plt.show()
     Atimes = df.Atime.unique()
     [str(i) for i in Atimes]
 
@@ -110,7 +113,7 @@ if use_carnot:
     #     fig.update_xaxes(rangeslider_visible=True)
     #     fig.show()
 
-    for i in [4, 78, 209, 700, 900, 1200, 1241]:
+    for i in [4, 78, 209, 700]:
         print(df[df['Atime'] == Atimes[i]])
         # Fucking dublicated signal !
         # Forecasts (almost!)  always start with 22.00  == 24.00 in UTC+2 (summer time), 22 == 23 in UTC+1 (winter time)
@@ -140,7 +143,7 @@ dfspot['Time'] = pd.to_datetime(dfspot['Time'], format='%Y-%m-%d %H:%M:%S')
 
 ###### Insert known prices in Carnot forecasts (!)
     # Hours ahead where price is known  # Assume available at 13 o' clock CET/CEST
-df['Atime_CET/CEST'] =  df.Atime.dt.tz_localize("UTC").dt.tz_convert("Europe/Copenhagen")
+df['Atime_CET/CEST'] =  df.Atime.dt.tz_convert("Europe/Copenhagen")
 df['DayAhead_avail'] = df['Atime_CET/CEST'].dt.hour >= 13
 cnt = 0
 for i, atime in enumerate(df.Atime.unique()):
@@ -190,11 +193,16 @@ for i, atime in enumerate(df.Atime.unique()):
     df = pd.concat([df, dfA])
 print('Number of times hours were cut off', cnt)
 
+# Convert to datetime
+df['Time'] = pd.to_datetime(df['Time'], format='%Y-%m-%d %H:%M:%S', utc=True).dt.tz_localize(None)
+df['Atime'] = pd.to_datetime(df['Atime'], format='%Y-%m-%d %H:%M:%S', utc=True).dt.tz_localize(None)
+
 # (!) Merge df and dfspot on Time (!)
 df = pd.merge(df, dfspot, on='Time', how='left')
 
 # PredPrice = TruePrice if source=='nordpool_insert'
 df.loc[df['Source'] == 'nordpool_insert', 'PredPrice'] = df['TruePrice']
+df.reset_index(drop=True, inplace=True)
 
 # Delete rows in dfspot where dfspot.Time is not in df.Time, reverse order and reset index - and export
 dfspot = dfspot[dfspot['Time'].isin(df['Time'])]
@@ -204,7 +212,7 @@ endday = df.Atime.iloc[-1].date() + pd.Timedelta(days=2)
 dfspot = dfspot[dfspot['Time'] < pd.to_datetime(endday)]
 dfspot = dfspot.iloc[::-1]
 dfspot.reset_index(drop=True, inplace=True)
-dfspot.to_csv('data/spotprice/df_spot_commontime.csv', index=False)
+dfspot.to_csv('data/spotprice/df_TEST_spot_commontime.csv', index=False)
 endtime = dfspot['Time'].iloc[-1]
 del dfspot
 
@@ -227,9 +235,9 @@ if plot_alot:
     plt.ylabel('Number of forecasts')
     plt.legend()
     # Set typography for this plot only
-    #plt.show()
+    plt.show()
     # Export plt
-    plt.savefig('plots/Carnot/Forecast_Lengths_postprocessed.pdf', bbox_inches='tight')
+    #plt.savefig('plots/Carnot/Forecast_Lengths_postprocessed.pdf', bbox_inches='tight')
 
 # Plot Price vs TruePrice using plotly
 if plot_alot:
@@ -241,9 +249,9 @@ if plot_alot:
     fig.show()
 
 # For each unique Atime, plot the Price and TruePrice using matplotlib and save to pdf
-pdf = matplotlib.backends.backend_pdf.PdfPages("plots/ModPredictions_movie_CARNOT="+str(use_carnot)+".pdf")
+#pdf = matplotlib.backends.backend_pdf.PdfPages("plots/ModPredictions_movie_CARNOT="+str(use_carnot)+".pdf")
 if plot: # Change to run=True for plotting
-    for Atime in df['Atime'].unique()[]:
+    for Atime in df['Atime'].unique()[:10]:
         dfA = df[df['Atime'] == Atime]
         fig = plt.figure()
         plt.plot(dfA['Time'], dfA['PredPrice'], label='PredPrice')
@@ -259,7 +267,7 @@ if plot: # Change to run=True for plotting
         #plt.show()
         #fig.savefig('plots/Carnot/plot_' + str(Atime) + '.pdf')
         pdf.savefig(fig)
-    pdf.close()
+    #pdf.close()
 
 
 # For each unique Atime, print the Price and TruePrice
@@ -310,20 +318,10 @@ def SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=None, 
     diff = pd.Series((pd.Series(df2['Atime_next']).dt.ceil('H') - pd.Series(df2['Atime']).dt.ceil('H'))).dt
     df2.insert(1, 'Atime_diff', (diff.days * 24 + diff.seconds/3600).astype(int))
     df2.drop(columns=['Atime_next'], inplace=True)
-
-    # Greener El forecasts
-    if use_known_prices & (dftrue is not None) & (not use_carnot):
-        print('Using known prices')
-        # Hours ahead where price is known  # Assume available at 13 o' clock CET/CEST
-        wellknownhours = 48 - (df2['Atime'].dt.hour + 1)
-
-        # Replace values        
-        for j, wk in enumerate(wellknownhours):
-            for i in range(0, wk):
-                df2.loc[j, 't' + str(i)] = dftrue.loc[j, 't' + str(i)]
     return df2
-dft = SliceDataFrame(df, h, var='TruePrice', BigM=BigM) #df with TruePrice as values
-dfp = SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
+
+#dft = SliceDataFrame(df, h, var='TruePrice', BigM=BigM) #df with TruePrice as values
+#dfp = SliceDataFrame(df, h, var='PredPrice', use_known_prices=False, dftrue=dft, BigM=BigM) #df with (predicted) Price as values
 
 if not use_carnot:
     # df with only known prices, for imput to Day-Ahead Smart Charge
@@ -342,20 +340,20 @@ if not use_carnot:
     dfk.to_csv('data/MPC-ready/df_knownprices_for_mpc.csv', index=False)
 
 ### Export to csv
-dft.to_csv('data/MPC-ready/df_trueprices_for_mpc.csv', index=False)
-dfp.to_csv('data/MPC-ready/df_predprices_for_mpc.csv', index=False)
+#dft.to_csv('data/MPC-ready/df_TEST_trueprices_for_mpc.csv', index=False)
+#dfp.to_csv('data/MPC-ready/df_TEST_predprices_for_mpc.csv', index=False)
 
 # Import from csv
-dft = pd.read_csv('data/MPC-ready/df_trueprices_for_mpc.csv')
-dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv')
+dft = pd.read_csv('data/MPC-ready/df_TEST_trueprices_for_mpc.csv')
+dfp = pd.read_csv('data/MPC-ready/df_TEST_predprices_for_mpc.csv')
 
 # For each Atime plot the Predicted Price (dfp) and TruePrice (dft) throughout the horizon
 K_plots = len(dfp['Atime'].unique()) # 200
 assert K_plots == len(dfp), 'K_plots should be equal to number of unique Atimes'
 #minH = df['Atime'].value_counts().min()
 minH = 145
-pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Carnot/PredictionMovie_Carnot.pdf")
-if plot: # Change to run=True for plotting
+pdf = matplotlib.backends.backend_pdf.PdfPages("plots/Carnot/PredictionMovie_TEST_Carnot.pdf")
+if True: # Change to run=True for plotting
     # Replace BigM with NaN
     dfp = dfp.replace(BigM, np.nan)
     dft = dft.replace(BigM*2, np.nan)
@@ -379,19 +377,10 @@ if plot: # Change to run=True for plotting
         ltext  = leg.get_texts()
         plt.setp(ltext, fontsize='small')
         fig.tight_layout()
-        # Change font
+        # Change font 
         #plt.show()
         #fig.savefig('plots/PredMovie2/PredictedPrice_' + str(Atime) + '.pdf')
         pdf.savefig(fig)
     pdf.close()
 
 ##############################################################################  
-    
-#### About Greener El forecasts #####
-# They are OK, but
-# 1) When the first 12-36 hours are completely known, they should be part of the "forecast" (HANDLED)
-#     - All forecasts are made AFTER that the spot prices are publicly available at NordPool.
-#     - So it is reasonable to assume known prices for the rest of the day and the day after.
-# 2) The forecasts (at Atime) typicaly starts with forecasting an hour or two of the alread passed time. (HANDLED)
-# 3) Some days, multiple forecasts have been run. The forecasts do not agree (eventhough on known price). This should be dealt with.
-#    Probably by using the latest. (HANDLED) if MPC is identifying latest Atime when run.

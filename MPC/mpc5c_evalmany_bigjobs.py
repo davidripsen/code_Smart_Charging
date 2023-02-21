@@ -40,13 +40,20 @@ folders = ['15-02-2023__17h_06m_54s',
     '16-02-2023__17h_25m_00s',
     '16-02-2023__17h_25m_10s',
     '16-02-2023__17h_25m_18s',
-    '16-02-2023__17h_25m_25s']
+    '16-02-2023__17h_25m_25s',
+    '20-02-2023__15h_41m_03s',
+    '20-02-2023__15h_41m_19s',
+    '20-02-2023__15h_41m_27s',
+    '20-02-2023__15h_41m_36s',
+    '20-02-2023__15h_41m_44s', # OPTIMAL
+    '20-02-2023__15h_41m_54s',
+    '20-02-2023__15h_42m_03s']
 
 # Store mean and median of each model of each foldername/job
-RESULTS = pd.DataFrame(columns=['model','mean', 'median', 'std'])
+RESULTS = pd.DataFrame(columns=['model','mean', 'median', 'stdofmean'])
 
 for folder in folders:
-    folder = folder #'13-02-2023__18h_40m_16s'
+    folder = folder # folder = '20-02-2023__15h_41m_44s' (OPTIMAL)
     D = pd.read_csv('results/'+folder+'/results.csv')
     D = D[D != ' - ']
     #D = D.dropna()
@@ -74,7 +81,7 @@ for folder in folders:
     # Store mean and median of each model across all jobs
     for col in D.columns:
         if col not in ['pf','dc','vehicle_id']:
-            RESULTS.loc[len(RESULTS)] = [col+'_'+note, D[col].mean(), D[col].median(), D[col].std()]
+            RESULTS.loc[len(RESULTS)] = [col+'_'+note, D[col].mean(), D[col].median(), D[col].std()/np.sqrt(len(D))]
 
     # Make a boxplot of the values from each model using plotly. Give them distinct colors.
     fig = go.Figure()
@@ -91,6 +98,7 @@ for folder in folders:
 # fig.update_layout(layout)
 # fig.update_traces(line_width=1, marker_size=2)
 # fig.write_image(path+'resultsBoxplot.pdf')
+
 
 
 
@@ -145,9 +153,11 @@ fig.show()
 # Analyse Grid Search RESULTS
 
 # Which are the 5 best models?
-RESULTS.sort_values(by='mean', ascending=True).head(100)
+RESULTS.sort_values(by='median', ascending=True).head(30)
     # Stoch: h = 3, lambda = 0.3, p=0.4
     # DA: p=0.3
     # MDA: h=3, lambda=0.2, p=0.4
+
+    # N = 10
 
     # NOW: READ NEW FORECASTS

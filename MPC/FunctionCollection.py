@@ -485,11 +485,11 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
                 return(prob, X, B, flag_AllFeasible)
 
 # Maitained here
-def ExtractEVdataForMPC(dfv, z_var, u_var, uhat_var, bmin_var, p):
+def ExtractEVdataForMPC(dfv, z_var, u_var, uhat_var, bmin_var, p, data=''):
     # Read the dfp and dft and dfspot --- This section can be moved out of the function to save a slgiht bit of time
-    dfp = pd.read_csv('data/MPC-ready/df_predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
-    dft = pd.read_csv('data/MPC-ready/df_trueprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
-    dfspot = pd.read_csv('data/spotprice/df_spot_commontime.csv', sep=',', header=0, parse_dates=True)
+    dfp = pd.read_csv(f'data/MPC-ready/df_{data}predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
+    dft = pd.read_csv(f'data/MPC-ready/df_{data}trueprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
+    dfspot = pd.read_csv(f'data/spotprice/df_{data}spot_commontime.csv', sep=',', header=0, parse_dates=True)
 
     dft['Atime'] = pd.to_datetime(dft['Atime'], format='%Y-%m-%d %H:%M:%S')
     dfp['Atime'] = pd.to_datetime(dfp['Atime'], format='%Y-%m-%d %H:%M:%S')

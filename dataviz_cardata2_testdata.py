@@ -501,6 +501,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=853, plot_efficiency_and_SOCmin=True, vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[99], vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, plot_efficiency_and_SOCmin=True, vertical_hover=False, df_only=False)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=14597, plot_efficiency_and_SOCmin=True, vertical_hover=False)
 # Drop variables in dfv
 dfv = dfv.drop(['use_dailyaverage', 'use_rolling', 'use_ewm', 'efficiency'], axis=1)
 # Add index as the first column and reset index
@@ -528,17 +529,20 @@ for df in DFV:
     selected_vehicle_ids.append(df['vehicle_id'][0])
 
 # Subset testdata
-firsttime = datetime.datetime(2022, 11, 2, 0, 0, 0)
-lasttime = datetime.datetime(2023, 1, 1, 23, 59, 59)
+firsttime = datetime.datetime(2022, 11, 12, 0, 0, 0)
+lasttime = datetime.datetime(2023, 1, 11, 11, 59, 59)
 firsttime = firsttime.replace(tzinfo=datetime.timezone.utc)
 lasttime = lasttime.replace(tzinfo=datetime.timezone.utc)
 
+# Remove vehicles manually, if they practicically didn't charge in the testperiod
+# Export
+selected_vehicle_ids = [x for x in selected_vehicle_ids if x not in [3011, 1352, 24727, 14597, 32278, 21745]]
 DFVtest = []
 for id in selected_vehicle_ids:
     print("Plotting vehicle", id)
     dfv = PlotChargingProfile(D2, id=id, df_only=True, plot_efficiency_and_SOCmin=False, vertical_hover=False)
     dfv = dfv.loc[firsttime:lasttime]
-    PlotChargingProfile(dfvehicle=dfv, id=id, plot_efficiency_and_SOCmin=False)
+    #PlotChargingProfile(dfvehicle=dfv, id=id, plot_efficiency_and_SOCmin=False)
     DFVtest.append(dfv)
 
 # Export list of vehicles
