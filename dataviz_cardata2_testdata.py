@@ -153,7 +153,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
             # bmin (PURELY INPUT ASSUMPTION)
             min_charged = 0.40 # 40% of battery capacity
             min_alltime = 0.05 # Never go below 5%
-            df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOCmin'] = min_charged * df['BatteryCapacity'][i] # Min SOC
+            df.loc[D2v.iloc[i]['PLANNED_PICKUP_AT'].floor('H'), 'SOCmin'] = min_charged * df['BatteryCapacity'][i] # Min SO C
             df['SOCmin'] = df['SOCmin'].fillna(min_alltime * df['BatteryCapacity'][i])
 
 
@@ -525,8 +525,11 @@ with open('data/MPC-ready/df_vehicle_list.pkl', 'rb') as f:
 
 # Extract vehicle ids from DFV
 selected_vehicle_ids = []
+selected_efficiency_median = []
 for df in DFV:
     selected_vehicle_ids.append(df['vehicle_id'][0])
+    selected_efficiency_median.append(df['efficiency_median'][0])
+
 
 # Subset testdata
 firsttime = datetime.datetime(2022, 11, 12, 0, 0, 0)
@@ -537,15 +540,76 @@ lasttime = lasttime.replace(tzinfo=datetime.timezone.utc)
 # Remove vehicles manually, if they practicically didn't charge in the testperiod
 # Export
 selected_vehicle_ids = [x for x in selected_vehicle_ids if x not in [3011, 1352, 24727, 14597, 32278, 21745]]
+re_use_efficiencies = False
+
 DFVtest = []
 for id in selected_vehicle_ids:
     print("Plotting vehicle", id)
     dfv = PlotChargingProfile(D2, id=id, df_only=True, plot_efficiency_and_SOCmin=False, vertical_hover=False)
     dfv = dfv.loc[firsttime:lasttime]
+    if re_use_efficiencies:
+        dfv['efficiency_median'] = selected_efficiency_median[selected_vehicle_ids.index(id)] # Insert old fitted median efficiencies
     #PlotChargingProfile(dfvehicle=dfv, id=id, plot_efficiency_and_SOCmin=False)
     DFVtest.append(dfv)
 
-# Export list of vehicles
-with open('data/MPC-ready/df_TEST_vehicle_list.pkl', 'wb') as f:
-    pickle.dump(DFVtest, f)
+# # Export list of vehicles
+# with open('data/MPC-ready/df_TEST_vehicle_list.pkl', 'wb') as f:
+#     pickle.dump(DFVtest, f)
 
+
+
+# SIMILARLY EXPORT 100 **NEW** VEHICLES
+
+# Show the top 10 vehicles with the most charging sessions, where battery capacity >= 40 kWh
+DFV = []
+indx = D2['capacity_kwh'] >= 40
+vehicles_sorted = D2['VEHICLE_ID'][indx].value_counts().index
+bad_ids = [] # Bad ids
+N = 100 + len(bad_ids)+len(selected_vehicle_ids) - 35
+for id in vehicles_sorted[:N]:
+    if (id in bad_ids) or (id in selected_vehicle_ids):
+        print("    [Skipping vehicle", id, "]")
+        continue
+    print("Plotting vehicle", id)
+    dfv = PlotChargingProfile(D2, id=id, df_only=True, plot_efficiency_and_SOCmin=False, vertical_hover=False)
+    dfv = dfv.loc[firsttime:lasttime]
+    #PlotChargingProfile(dfvehicle=dfv, id=id, plot_efficiency_and_SOCmin=False)
+    DFV.append(dfv)
+
+# Export list of vehicles
+with open('data/MPC-ready/df_TEST_NEW_vehicle_list.pkl', 'wb') as f:
+    pickle.dump(DFV, f)
+# Random vehicles?
+
+
+# Extract 100 random vehicles (that have been plugged in at least 5 five times during the two months period.
+DFV = []
+indx = D2['capacity_kwh'] >= 40
+np.random.seed(1337)
+vehicles = np.array(D2['VEHICLE_ID'][indx].value_counts().index, dtype=int)
+np.random.shuffle(vehicles)
+bad_ids = [33783, 832, 38950, 18637, 19967, 31113, 33692, 35444, 19004, 16198, 41332, 36566,21204] # Bad ids
+N = 130 + len(bad_ids)
+for id in vehicles:
+    if (id in bad_ids):
+        print("    [Skipping vehicle", id, "]")
+        continue
+    print("Plotting vehicle", id)
+    try:
+        dfv = PlotChargingProfile(D2, id=id, df_only=True, plot_efficiency_and_SOCmin=False, vertical_hover=False)
+        dfv = dfv.loc[firsttime:lasttime]
+        if sum(dfv.use > 1) < 4: # Min 5 charge sessions
+            continue
+        PlotChargingProfile(dfvehicle=dfv, id=id, plot_efficiency_and_SOCmin=False)
+    except:
+       print("    [Skipping vehicle", id, "]")
+       continue
+
+    DFV.append(dfv)
+    if len(DFV) == 100:
+        break
+
+# Export list of vehicles
+with open('data/MPC-ready/df_TEST_RANDOM_vehicle_list.pkl', 'wb') as f:
+    pickle.dump(DFV, f)
+# Random vehicles?

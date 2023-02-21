@@ -292,6 +292,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
         l = dfp['l_hours_avail'][i]+1
         # For each hour until next forecast
         for j in range(dfp['Atime_diff'][i]):
+            flag_OutOfForecasts = False
             if k%50 == 0:
                 print("k = " + str(k) + " of " + str(L-1))
             
@@ -315,7 +316,14 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
                 
             # Patch holes in forecasts (2 out of 2) - use known prices
             #c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(3+H+1)].to_numpy()[:min(l,h+1)]
-            c_forecast[:min(l,h+1)] = c[k:k+min(l,h+1)]
+            try:
+               c_forecast[:min(l,h+1)] = c[k:k+min(l,h+1)]
+            except:
+                # Edge case: If c_forecast has become shorter than known hours: fix
+                if min(l,h+1) > len(c_forecast):
+                    c_forecast = c[k:k+min(l,h+1)]
+                    flag_OutOfForecasts = True
+                    print("flag: Out Of Forecasts")
             
             # Extract deterministic and stochastic prices
             if KMweights is None:
@@ -323,8 +331,14 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
                 scenarioExtract = scenarios[idx:idx+n_scenarios, :] # Subset new scenarios every iteration
             else:
                 scenarioExtract = scenarios
+            
+            # Extract prices
             c_d = c_forecast[:l] # Deterministic part
-            c_s = c_forecast + scenarioExtract[:, j:(H+1)] # Stochastic part
+            #print("k = " + str(k) + " of " + str(L-1) + " i = "+str(i)," - l = " + str(l) + " - h = " + str(h) + " - j = " + str(j) + " - c_d = " + str(c_d) + " - c_forecast = " + str(c_forecast))
+            if not flag_OutOfForecasts:
+                c_s = c_forecast + scenarioExtract[:, j:(H+1)] # Stochastic part
+            else:
+                c_s = c_forecast + np.zeros((n_scenarios, len(c_forecast)))
             c_s[c_s < 0] = 0 # Truncate cost_stochastic to assume non-negative electricity spot prices. Conclussion: Performed better.
 
             # Find relevant input at the specific hours of flexibility
@@ -429,8 +443,14 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
                 
             # Patch holes in forecasts (2 out of 2) - use known prices
             #c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(3+H+1)].to_numpy()[:min(l,h+1)]
-            c_forecast[:min(l,h+1)] = c[k:k+min(l,h+1)]
-            
+            #print("k = " + str(k) + " of " + str(L-1) + " (h = " + str(h) + ") i=" + str(i) + " j=" + str(j) + " l=" + str(l) + " c_forecast = " + str(c_forecast))
+            try:
+               c_forecast[:min(l,h+1)] = c[k:k+min(l,h+1)]
+            except:
+                # Edge case: If c_forecast has become shorter than known hours: fix
+                if min(l,h+1) > len(c_forecast):
+                    c_forecast = c[k:k+min(l,h+1)]
+
             
             # Find relevant input at the specific hours of flexibility
             tvec_i = np.arange(k, k+h+1)
@@ -439,7 +459,7 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
 
             u_forecast = np.repeat(uhat[k], h+1) # = actually uhat[k-1], but a 0 has been appended as first value.
             if perfectForesight:
-                u_forecast = u[tvec_i]  
+                u_forecast = u[tvec_i]
             u_t_true = u[k]
             
             assert len(c_forecast) >= 12, "c_forecast too short"
@@ -487,9 +507,9 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
 # Maitained here
 def ExtractEVdataForMPC(dfv, z_var, u_var, uhat_var, bmin_var, p, data=''):
     # Read the dfp and dft and dfspot --- This section can be moved out of the function to save a slgiht bit of time
-    dfp = pd.read_csv(f'data/MPC-ready/df_{data}predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
-    dft = pd.read_csv(f'data/MPC-ready/df_{data}trueprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
-    dfspot = pd.read_csv(f'data/spotprice/df_{data}spot_commontime.csv', sep=',', header=0, parse_dates=True)
+    dfp = pd.read_csv(f'data/MPC-ready/df_{data[:5]}predprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
+    dft = pd.read_csv(f'data/MPC-ready/df_{data[:5]}trueprices_for_mpc.csv', sep=',', header=0, parse_dates=True)
+    dfspot = pd.read_csv(f'data/spotprice/df_{data[:5]}spot_commontime.csv', sep=',', header=0, parse_dates=True)
 
     dft['Atime'] = pd.to_datetime(dft['Atime'], format='%Y-%m-%d %H:%M:%S')
     dfp['Atime'] = pd.to_datetime(dfp['Atime'], format='%Y-%m-%d %H:%M:%S')

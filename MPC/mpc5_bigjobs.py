@@ -26,14 +26,15 @@ p = 0.4 # p=0.4 Quantile for c_tilde
 p_DA = 0.3
 alpha = 0.3 # alpha=0.3 Shrinkage
 #N = 10 # Rolling length = [1, 3, 5, 7, 10, 14, 21]
-data = 'TEST_' # data='' for train,   "TEST_" for test
+data = 'TEST_RANDOM_' # data='' for train,   "TEST_" for test
 
+
+NOTE =  f'Run h=3,4,5,6 ({data}data, i.e. random vehicles)' # Optional message to output folder
+export_only = True # Open plot?
 runDeterministicReference = True
-export_only = False # Open plot?
-NOTE =  f'Run (TEST data)' # Optional message to output folder
-print(NOTE) 
+print(NOTE)
 
-# Save results, note and copy of code
+# Mkdir, Save results, note and copy of code
 os.mkdir('results/'+nowstring)
 if NOTE != '':
     # Write note to file
@@ -52,7 +53,7 @@ AbsolutePerformance = lambda x, dc:       dc-x
 
 # Models
 models_h = ['stoch', 'mda'] #['stochKM', 'stoch', 'mda']
-models_plain = ['da', 'pf', 'dc', 'hist'] # hist = historic charging using Montas Smart Charging
+models_plain = ['da', 'pf', 'dc'] # hist = historic charging using Montas Smart Charging
 horizons = [3,4,5,6]
 models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for h in horizons]
 
@@ -78,6 +79,7 @@ absolutePerformances = pd.DataFrame(columns=[model for model in models]+ ['vehic
 # Loop over vehicles
 for i in range(len(DFV)):
     #i = 0 # i=2 Good performance (from stochastic model), i=3: Shitty performance
+    print(NOTE)
     dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
                                                                                                                                                     uhat_var=f'use_org_rolling', bmin_var='SOCmin_everymorning',
                                                                                                                                                     p=p, data=data) # (dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',                                                                                                                                                                                                                   # uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
