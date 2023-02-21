@@ -26,10 +26,10 @@ p = 0.4 # p=0.4 Quantile for c_tilde
 p_DA = 0.3
 alpha = 0.3 # alpha=0.3 Shrinkage
 #N = 10 # Rolling length = [1, 3, 5, 7, 10, 14, 21]
-data = 'TEST_RANDOM_' # data='' for train,   "TEST_" for test
+data = 'TEST_' # data='' for train,   "TEST_" for test, "TEST_NEW_" for new vehicles test set, "TEST_RANDOM_" for random vehicles test set
 
 
-NOTE =  f'Run h=3,4,5,6 ({data}data, i.e. random vehicles)' # Optional message to output folder
+NOTE =  f'Run h=3 ({data}data, i.e. same vehicles)' # Optional message to output folder
 export_only = True # Open plot?
 runDeterministicReference = True
 print(NOTE)
@@ -54,7 +54,7 @@ AbsolutePerformance = lambda x, dc:       dc-x
 # Models
 models_h = ['stoch', 'mda'] #['stochKM', 'stoch', 'mda']
 models_plain = ['da', 'pf', 'dc'] # hist = historic charging using Montas Smart Charging
-horizons = [3,4,5,6]
+horizons = [3]
 models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for h in horizons]
 
 # n_clusters  (= n_scenarios)
