@@ -462,8 +462,6 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
                 u_forecast = u[tvec_i]
             u_t_true = u[k]
             
-            assert len(c_forecast) >= 12, "c_forecast too short"
-
             # Solve
             if z_i[0] != 0:
                 prob, x, b = ImperfectForesight(b0, bmax, bmin_i, xmax, c_forecast, c_tilde, u_t_true, u_forecast, z_i, h, tvec, r, verbose=False) # Yes, it is tvec=0..h, NOT tvec_i
