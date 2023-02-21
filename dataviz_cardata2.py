@@ -564,6 +564,37 @@ plt.show()
 # Make a new script for doing the juicy stuff
 
 
+# Extract 100 random vehicles (that have been plugged in at least 5 five times during the two months period.
+DFV = []
+indx = D2['capacity_kwh'] >= 40
+np.random.seed(1337)
+vehicles = np.array(D2['VEHICLE_ID'][indx].value_counts().index, dtype=int)
+np.random.shuffle(vehicles)
+bad_ids = [] # Bad ids
+for id in vehicles:
+    if (id in bad_ids):
+        print("    [Skipping vehicle", id, "]")
+        continue
+    print("Plotting vehicle", id)
+    try:
+        dfv = PlotChargingProfile(D2, id=id, df_only=True, plot_efficiency_and_SOCmin=False, vertical_hover=False)
+        if sum(dfv.use > 1) < 4: # Min 4 charge sessions
+            continue
+        PlotChargingProfile(dfvehicle=dfv, id=id, plot_efficiency_and_SOCmin=False)
+    except:
+       print("    [Skipping vehicle", id, "]")
+       continue
+
+    DFV.append(dfv)
+    if len(DFV) == 100:
+        break
+
+# Export list of vehicles
+with open('data/MPC-ready/df_TRAIN_RANDOM_vehicle_list.pkl', 'wb') as f:
+    pickle.dump(DFV, f)
+# Random vehicles?
+
+
 
 ############## What I need - how I need it  ###############################################
 # z_t possible to calculate in near-future  :-)  z_t = CABLE_PLUGGED_IN - RELEASED_AT (eller PLANNED_PICKUP_AT ?), when Marcos has extracted as datetime

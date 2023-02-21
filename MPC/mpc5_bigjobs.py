@@ -53,7 +53,7 @@ AbsolutePerformance = lambda x, dc:       dc-x
 
 # Models
 models_h = ['stoch', 'mda'] #['stochKM', 'stoch', 'mda']
-models_plain = ['da', 'pf', 'dc'] # hist = historic charging using Montas Smart Charging
+models_plain = ['da', 'pf', 'dc', 'hist'] # hist = historic charging using Montas Smart Charging
 horizons = [3]
 models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for h in horizons]
 
