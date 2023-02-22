@@ -18,12 +18,11 @@ path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
 # Specify
-folder = '21-02-2023__21h_47m_46s'
+folder = '22-02-2023__09h_13m_46s'
+manuel_title="Total Cost of charging each random vehicle during test period"
+nameofplot = 'randomtestresultsGridSearchTC'
 measure = 'results'
-manuel_title="Total Cost of charging each new vehicle during test period"
 y_title = 'DKK'
-nameofplot = 'newtestresultsGridSearchTC'
-
 
 # Read data
 D = pd.read_csv('results/'+folder+'/'+measure+'.csv')
@@ -72,7 +71,7 @@ RESULTS = pd.DataFrame(columns=['model','mean', 'median', 'stdofmean'])
 for col in order:
         if col not in ['vehicle_id']:
             RESULTS.loc[len(RESULTS)] = [col+'_'+note, D[col].mean(), D[col].median(), D[col].std()/np.sqrt(len(D))]
-
+RESULTS
 
 # Repeat for only strictly feasible solutions
 fig = go.Figure()
