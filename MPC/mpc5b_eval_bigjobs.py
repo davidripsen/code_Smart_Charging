@@ -18,14 +18,18 @@ path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
 folder = '21-02-2023__12h_44m_00s'
-D = pd.read_csv('results/'+folder+'/relativePerformances.csv')
+measure = 'results'
+manuel_title="Total Cost of charging each vehicle during training period"
+D = pd.read_csv('results/'+folder+'/'+measure+'.csv')
 D = D[D != ' - ']
 #D = D.dropna()
 D = D.astype(float)
+order = ['pf', 'da'] + [i for i in D.columns if i[:5]=='stoch'] + [i for i in D.columns if i[:3]=='mda'] + ['hist'] + ['dc']
+
 # Read txt file Note
 with open('results/'+folder+'/NOTE.txt', 'r') as file:
     note = file.read()
-Dres = pd.read_csv('results/'+folder+'/results.csv')
+Dres = pd.read_csv(f'results/'+folder+'/{measure}.csv')
 Dres = Dres[Dres != ' - ']
 #Dres = Dres.dropna()
 Dres = Dres.astype(float)
@@ -42,25 +46,28 @@ round(Dfeas.describe(),2)
 
 # Make a boxplot of the values from each model using plotly. Give them distinct colors.
 fig = go.Figure()
-for i, col in enumerate(D.columns):
-    if col not in ['pf','dc','vehicle_id']:
+for i, col in enumerate(order): #enumerate(D.columns):
+    if col not in ['vehicle_id']:
         fig.add_trace(go.Box(y=D[col], name=col, boxpoints='all', jitter=0.3, pointpos=-1.8, marker_color=px.colors.qualitative.Plotly[i%10]))
-fig.update_layout(title_text='Boxplot of relative performances of the models ('+note+')', title_x=0.5, showlegend=False)
+fig.update_layout(title_text=f'Boxplot of {measure} of the models ('+note+')', title_x=0.5, showlegend=False)
+if manuel_title: fig.update_layout(title_text=manuel_title)
 fig.update_traces(boxmean=True)
+fig.update_layout(xaxis_title_text='Model', yaxis_title_text = 'DKK')
+#fig.update_layout(yaxis_range=[0, 1.1])
 fig.show()
-# fig.update_traces(boxmean=True)
-# fig.write_html(pathhtml+'resultsBoxplot.html')
-# fig.update_layout(layout)
-# fig.update_traces(line_width=1, marker_size=2)
-# fig.write_image(path+'resultsBoxplot.pdf')
+fig.write_html(pathhtml+'resultsGridSearchTotalCosts.html')
+fig.update_layout(layout)
+fig.update_traces(line_width=1, marker_size=2)
+fig.write_image(path+'resultsGridSearchTotalCosts.pdf')
+
 
 
 # Repeat for only strictly feasible solutions
 fig = go.Figure()
 for i, col in enumerate(Dfeas.columns):
-    if col not in ['pf','dc','vehicle_id', 'mda6']:
+    if col not in ['pf','dc','vehicle_id']:
         fig.add_trace(go.Box(y=Dfeas[col], name=col, boxpoints='all', jitter=0.3, pointpos=-1.8, marker_color=px.colors.qualitative.Plotly[i%10]))
-fig.update_layout(title_text='Boxplot of relative performances of the models (only strictly feasible solutions) ('+note+')', title_x=0.5)
+fig.update_layout(title_text='Boxplot of {measure} of the models (only strictly feasible solutions) ('+note+')', title_x=0.5)
 fig.update_traces(boxmean=True)
 fig.show()
 
