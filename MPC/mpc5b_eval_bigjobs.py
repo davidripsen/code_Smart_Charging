@@ -18,10 +18,10 @@ path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
 # Specify
-folder = '21-02-2023__18h_38m_22s'
-measure = 'results'
-manuel_title="Total Cost of charging each same vehicle during test period"
-nameofplot = 'testresultsGridSearchTC'
+folder = '21-02-2023__21h_47m_46s'
+measure = 'relativePerformances'
+manuel_title="Relative Total Cost of charging each new vehicle during test period"
+nameofplot = 'newtestresultsGridSearchRTC'
 
 # Read data
 D = pd.read_csv('results/'+folder+'/'+measure+'.csv')
@@ -29,6 +29,7 @@ D = D[D != ' - ']
 #D = D.dropna()
 D = D.astype(float)
 order = ['pf', 'da'] + [i for i in D.columns if i[:5]=='stoch'] + [i for i in D.columns if i[:3]=='mda'] + ['dc']
+D = D[D.index != 19]
 
 # Read txt file Note
 with open('results/'+folder+'/NOTE.txt', 'r') as file:
@@ -56,8 +57,8 @@ for i, col in enumerate(order): #enumerate(D.columns):
 fig.update_layout(title_text=f'Boxplot of {measure} of the models ('+note+')', title_x=0.5, showlegend=False)
 if manuel_title: fig.update_layout(title_text=manuel_title)
 fig.update_traces(boxmean=True)
-fig.update_layout(xaxis_title_text='Model', yaxis_title_text = 'DKK')
-if measure=='relativePerformances':fig.update_layout(yaxis_range=[0, 0.4])
+fig.update_layout(xaxis_title_text='Model', yaxis_title_text = 'Relative Total Cost')
+if measure=='relativePerformances':fig.update_layout(yaxis_range=[-0.01, 1.01])
 fig.show()
 fig.write_html(pathhtml+nameofplot+'.html')
 fig.update_layout(layout)
