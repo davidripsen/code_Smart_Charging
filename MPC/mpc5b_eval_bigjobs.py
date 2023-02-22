@@ -19,10 +19,10 @@ pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCh
 
 # Specify
 folder = '22-02-2023__09h_13m_46s'
-manuel_title="Total Cost of charging each random vehicle during test period"
-nameofplot = 'randomtestresultsGridSearchTC'
-measure = 'results'
-y_title = 'DKK'
+manuel_title="Relative Total Cost of charging each random vehicle during test period"
+nameofplot = 'randomtestresultsGridSearchRTC'
+measure = 'relativePerformances'
+y_title = 'Relative Total Cost'
 
 # Read data
 D = pd.read_csv('results/'+folder+'/'+measure+'.csv')
@@ -30,7 +30,9 @@ D = D[D != ' - ']
 #D = D.dropna()
 D = D.astype(float)
 order = ['pf', 'da'] + [i for i in D.columns if i[:5]=='stoch'] + [i for i in D.columns if i[:3]=='mda'] + ['dc']
-D = D[D.index != 19]
+D = D[D.index != 31] #SLEEEET
+D = D[D.index != 79] #SLEEEET
+
 
 # Read txt file Note
 with open('results/'+folder+'/NOTE.txt', 'r') as file:
@@ -59,8 +61,8 @@ fig.update_layout(title_text=f'Boxplot of {measure} of the models ('+note+')', t
 if manuel_title: fig.update_layout(title_text=manuel_title)
 fig.update_traces(boxmean=True)
 fig.update_layout(xaxis_title_text='Model', yaxis_title_text = y_title)
-if measure=='relativePerformances':fig.update_layout(yaxis_range=[-00.1, 1])
-fig.update_layout(yaxis_range=[-5, 1.02*D.max()['dc']])
+if measure=='relativePerformances': fig.update_layout(yaxis_range=[-0.01, 1.01])
+#else: fig.update_layout(yaxis_range=[-5, 1.02*D.max()['dc']])
 fig.show()
 fig.write_html(pathhtml+nameofplot+'.html')
 fig.update_layout(layout)
