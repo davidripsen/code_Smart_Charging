@@ -18,8 +18,8 @@ path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
 folder = '21-02-2023__12h_44m_00s'
-measure = 'results'
-manuel_title="Total Cost of charging each vehicle during training period"
+measure = 'relativePerformances'
+manuel_title="Relative Total Cost of charging each vehicle during training period"
 D = pd.read_csv('results/'+folder+'/'+measure+'.csv')
 D = D[D != ' - ']
 #D = D.dropna()
@@ -52,13 +52,13 @@ for i, col in enumerate(order): #enumerate(D.columns):
 fig.update_layout(title_text=f'Boxplot of {measure} of the models ('+note+')', title_x=0.5, showlegend=False)
 if manuel_title: fig.update_layout(title_text=manuel_title)
 fig.update_traces(boxmean=True)
-fig.update_layout(xaxis_title_text='Model', yaxis_title_text = 'DKK')
-#fig.update_layout(yaxis_range=[0, 1.1])
+fig.update_layout(xaxis_title_text='Model', yaxis_title_text = 'Relative Total Cost')
+fig.update_layout(yaxis_range=[0, 0.4])
 fig.show()
-fig.write_html(pathhtml+'resultsGridSearchTotalCosts.html')
+fig.write_html(pathhtml+'resultsGridSearchRTC.html')
 fig.update_layout(layout)
 fig.update_traces(line_width=1, marker_size=2)
-fig.write_image(path+'resultsGridSearchTotalCosts.pdf')
+fig.write_image(path+'resultsGridSearchRTC.pdf')
 
 
 
