@@ -17,8 +17,8 @@ layout = dict(font=dict(family='Computer Modern',size=11),
 path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/Results/'
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
-folder = '13-02-2023__18h_40m_16s'
-D = pd.read_csv('results/'+folder+'/results.csv')
+folder = '21-02-2023__12h_44m_00s'
+D = pd.read_csv('results/'+folder+'/relativePerformances.csv')
 D = D[D != ' - ']
 #D = D.dropna()
 D = D.astype(float)

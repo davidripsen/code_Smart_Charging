@@ -498,7 +498,7 @@ def PlotChargingProfile(D2=None, dfvehicle=None, var="VEHICLE_ID", id=13267, plo
 ## Export plots for report
 #dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=13923, plot_efficiency_and_SOCmin=True, vertical_hover=False, layout=layout, imgtitle="use_curves_id")
 
-dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=853, plot_efficiency_and_SOCmin=True, vertical_hover=False)
+dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=29185, plot_efficiency_and_SOCmin=True, vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=vehicle_ids[99], vertical_hover=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=24727, plot_efficiency_and_SOCmin=True, vertical_hover=False, df_only=False)
 dfv = PlotChargingProfile(D2, var="VEHICLE_ID", id=14597, plot_efficiency_and_SOCmin=True, vertical_hover=False)
@@ -533,7 +533,7 @@ for df in DFV:
 
 # Subset testdata
 firsttime = datetime.datetime(2022, 11, 12, 0, 0, 0)
-lasttime = datetime.datetime(2023, 1, 11, 11, 59, 59)
+lasttime = datetime.datetime(2023, 1, 5, 23, 59, 59)
 firsttime = firsttime.replace(tzinfo=datetime.timezone.utc)
 lasttime = lasttime.replace(tzinfo=datetime.timezone.utc)
 
@@ -598,7 +598,7 @@ for id in vehicles:
     try:
         dfv = PlotChargingProfile(D2, id=id, df_only=True, plot_efficiency_and_SOCmin=False, vertical_hover=False)
         dfv = dfv.loc[firsttime:lasttime]
-        if sum(dfv.use > 1) < 4: # Min 5 charge sessions
+        if (sum(dfv.use > 1) < 4) or len(dfv)<24*7*2: # Min 2 weeks of data and min. 4 charge sessions
             continue
         PlotChargingProfile(dfvehicle=dfv, id=id, plot_efficiency_and_SOCmin=False)
     except:

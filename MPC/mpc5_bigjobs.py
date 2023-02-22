@@ -26,10 +26,10 @@ p = 0.4 # p=0.4 Quantile for c_tilde
 p_DA = 0.3
 alpha = 0.3 # alpha=0.3 Shrinkage
 #N = 10 # Rolling length = [1, 3, 5, 7, 10, 14, 21]
-data = 'TEST_' # data='' for train,   "TEST_" for test, "TEST_NEW_" for new vehicles test set, "TEST_RANDOM_" for random vehicles test set
+data = 'TEST_RANDOM_' # data='' for train,   "TEST_" for test, "TEST_NEW_" for new vehicles test set, "TEST_RANDOM_" for random vehicles test set
 
 
-NOTE =  f'Run h=3 ({data}data, i.e. same vehicles)' # Optional message to output folder
+NOTE =  f'Run h=3 ({data}data)' # Optional message to output folder
 export_only = True # Open plot?
 runDeterministicReference = True
 print(NOTE)
@@ -80,88 +80,92 @@ absolutePerformances = pd.DataFrame(columns=[model for model in models]+ ['vehic
 for i in range(len(DFV)):
     #i = 0 # i=2 Good performance (from stochastic model), i=3: Shitty performance
     print(NOTE)
-    dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
-                                                                                                                                                    uhat_var=f'use_org_rolling', bmin_var='SOCmin_everymorning',
-                                                                                                                                                    p=p, data=data) # (dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',                                                                                                                                                                                                                   # uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
-    print('Vehicle ID = ', vehicle_id, ' (', i, '/', len(DFV)-1, ')')
-    results['vehicle_id'][i] = vehicle_id
-    infeasibles['vehicle_id'][i] = vehicle_id
-    relativePerformances['vehicle_id'][i] = vehicle_id
-    absolutePerformances['vehicle_id'][i] = vehicle_id
- 
-    #################################################### LET'S GO! ########################################################
+    try:
+        dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
+                                                                                                                                                        uhat_var=f'use_org_rolling', bmin_var='SOCmin_everymorning',
+                                                                                                                                                        p=p, data=data) # (dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',                                                                                                                                                                                                                   # uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
+        print('Vehicle ID = ', vehicle_id, ' (', i, '/', len(DFV)-1, ')')
+        results['vehicle_id'][i] = vehicle_id
+        infeasibles['vehicle_id'][i] = vehicle_id
+        relativePerformances['vehicle_id'][i] = vehicle_id
+        absolutePerformances['vehicle_id'][i] = vehicle_id
+    
+        #################################################### LET'S GO! ########################################################
 
-    for h in horizons:
-        # Stochastic (without kMediods)
-        prob_stoch, x, b, flagFeasible_stoch = MultiDayStochastic(scenarios, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, perfectForesight=False, maxh=6*24, KMweights=None)
-        results['stoch'+str(h)][i] = round(prob_stoch['objective'],2)
-        infeasibles['stoch'+str(h)][i] = '  ' if flagFeasible_stoch else ' x '
-        plot_EMPC(prob_stoch, 'Stochastic Smart Charge (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=export_only, firsthour=firsthour, vehicle_id=vehicle_id)
+        for h in horizons:
+            # Stochastic (without kMediods)
+            prob_stoch, x, b, flagFeasible_stoch = MultiDayStochastic(scenarios, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, perfectForesight=False, maxh=6*24, KMweights=None)
+            results['stoch'+str(h)][i] = round(prob_stoch['objective'],2)
+            infeasibles['stoch'+str(h)][i] = '  ' if flagFeasible_stoch else ' x '
+            plot_EMPC(prob_stoch, 'Stochastic Smart Charge (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=export_only, firsthour=firsthour, vehicle_id=vehicle_id)
 
-        # # Stochastic with kMediods
-        # mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
-        # prob_stochKM, x, b, flagFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, KMweights=weights)
-        # results['stochKM'+str(h)][i] = round(prob_stochKM['objective'],2)
-        # infeasibles['stochKM'+str(h)][i] = '  ' if flagFeasible_stochKM else ' x '
-        # plot_EMPC(prob_stochKM, 'Stochastic-kMediods SC (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=export_only, firsthour=firsthour, vehicle_id=vehicle_id)
+            # # Stochastic with kMediods
+            # mediods, weights = getMediods(scenarios_all, n_clusters=n_clusters)
+            # prob_stochKM, x, b, flagFeasible_stochKM = MultiDayStochastic(mediods, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh=6*24, KMweights=weights)
+            # results['stochKM'+str(h)][i] = round(prob_stochKM['objective'],2)
+            # infeasibles['stochKM'+str(h)][i] = '  ' if flagFeasible_stochKM else ' x '
+            # plot_EMPC(prob_stochKM, 'Stochastic-kMediods SC (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=export_only, firsthour=firsthour, vehicle_id=vehicle_id)
+
+            if runDeterministicReference:
+                ### Multi-Dayahead (Deterministic)
+                # #h = 4*24 # 5 days horizon for the multi-day smart charge
+                prob_mda, x, b, flagFeasible_mda = MultiDay(dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=False)
+                results['mda'+str(h)][i] = round(prob_mda['objective'],2)
+                infeasibles['mda'+str(h)][i] = '  ' if flagFeasible_mda else ' x '
+                plot_EMPC(prob_mda, 'Multi-Day Smart Charge (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
+
 
         if runDeterministicReference:
-            ### Multi-Dayahead (Deterministic)
-            # #h = 4*24 # 5 days horizon for the multi-day smart charge
-            prob_mda, x, b, flagFeasible_mda = MultiDay(dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=False)
-            results['mda'+str(h)][i] = round(prob_mda['objective'],2)
-            infeasibles['mda'+str(h)][i] = '  ' if flagFeasible_mda else ' x '
-            plot_EMPC(prob_mda, 'Multi-Day Smart Charge (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
+            # Compare models on the data within horizon
+            maxh = 6*24
+            L = len(u) - (maxh+1)
+            T = L - 1
+            tvec = np.arange(T+1)
+            T_within = T #-maxh 
+            c_within = dfspot['TruePrice'][0:T_within+1] # Actually uses all prices in this case:-)
+            tvec_within = tvec[0:T_within+1]
+            z_within = z[0:T_within+1]
+            u_within = u[0:T_within+1]
+            u2_within = dfv['use'].to_numpy()[0:T_within+1]
+            bmin_within = bmin[0:T_within+2]
 
+            ### Day-Ahead SmartCharge
+            c_tilde_DA = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
+                                            uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=p_DA, data=data)[13]
+            prob_da, x, b, flagFeasible_da = MultiDay(dfp, dft, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde_DA, r, DayAhead=True, maxh=6*24, perfectForesight=False)
+            plot_EMPC(prob_da, 'Day-Ahead Smart Charge of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
+            results['da'][i] = round(prob_da['objective'],2)
+            infeasibles['da'][i] = '  ' if flagFeasible_da else ' x '
 
-    if runDeterministicReference:
-        # Compare models on the data within horizon
-        maxh = 6*24
-        L = len(u) - (maxh+1)
-        T = L - 1
-        tvec = np.arange(T+1)
-        T_within = T #-maxh 
-        c_within = dfspot['TruePrice'][0:T_within+1] # Actually uses all prices in this case:-)
-        tvec_within = tvec[0:T_within+1]
-        z_within = z[0:T_within+1]
-        u_within = u[0:T_within+1]
-        u2_within = dfv['use'].to_numpy()[0:T_within+1]
-        bmin_within = bmin[0:T_within+2]
+            ### Perfect Foresight
+            prob_pf, x, b = PerfectForesight(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r, verbose=True)
+            flagFeasible_pf = LpStatus[prob_pf.status] == 'Optimal'
+            plot_EMPC(prob_pf, 'Perfect Foresight of vehicle = '  + str(vehicle_id), x, b, u_within, c_within, z_within,  starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
+            results['pf'][i ] = round(value(prob_pf.objective),2)
+            infeasibles['pf'][i] = '  ' if flagFeasible_pf else ' x '
 
-        ### Day-Ahead SmartCharge
-        c_tilde_DA = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
-                                         uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=p_DA, data=data)[13]
-        prob_da, x, b, flagFeasible_da = MultiDay(dfp, dft, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde_DA, r, DayAhead=True, maxh=6*24, perfectForesight=False)
-        plot_EMPC(prob_da, 'Day-Ahead Smart Charge of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
-        results['da'][i] = round(prob_da['objective'],2)
-        infeasibles['da'][i] = '  ' if flagFeasible_da else ' x '
+            ### DumbCharge
+            prob_dc, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r, verbose=False)
+            flagFeasible_dc = LpStatus[prob_dc.status] == 'Optimal'
+            plot_EMPC(prob_dc, 'Dumb Charge of vehicle = ' + str(vehicle_id) + ' (r = '+str(round(r,2))+')', x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
+            results['dc'][i] =  round(value(prob_dc.objective),2)
+            infeasibles['dc'][i] = '  ' if flagFeasible_dc else ' x '
+            
+            ### Historic Montas Smart Charges
+            if data == '':  # Monta stopped collecting the actual charge history when the test period began.
+                prob_msc, x, b = MontasSmartCharge(dfv, u, z, L, b0, r, c_tilde)
+                plot_EMPC(prob_msc, 'Montas Smart Charge (dif. plug-in) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id, SOCorg=dfv['SOC'])
+                results['hist'][i] = round(value(prob_msc['objective']),2)
+                infeasibles['hist'][i] = '  '# if LpStatus[prob_msc.status] == 'Optimal' else ' x '
 
-        ### Perfect Foresight
-        prob_pf, x, b = PerfectForesight(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r, verbose=True)
-        flagFeasible_pf = LpStatus[prob_pf.status] == 'Optimal'
-        plot_EMPC(prob_pf, 'Perfect Foresight of vehicle = '  + str(vehicle_id), x, b, u_within, c_within, z_within,  starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
-        results['pf'][i ] = round(value(prob_pf.objective),2)
-        infeasibles['pf'][i] = '  ' if flagFeasible_pf else ' x '
-
-        ### DumbCharge
-        prob_dc, x, b = DumbCharge(b0, bmax, bmin_within, xmax, c_within, c_tilde, u_within, z_within, T_within, tvec_within, r=r, verbose=False)
-        flagFeasible_dc = LpStatus[prob_dc.status] == 'Optimal'
-        plot_EMPC(prob_dc, 'Dumb Charge of vehicle = ' + str(vehicle_id) + ' (r = '+str(round(r,2))+')', x, b, u_within, c_within, z_within, starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
-        results['dc'][i] =  round(value(prob_dc.objective),2)
-        infeasibles['dc'][i] = '  ' if flagFeasible_dc else ' x '
-        
-        ### Historic Montas Smart Charges
-        if data == '':  # Monta stopped collecting the actual charge history when the test period began.
-            prob_msc, x, b = MontasSmartCharge(dfv, u, z, L, b0, r, c_tilde)
-            plot_EMPC(prob_msc, 'Montas Smart Charge (dif. plug-in) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id, SOCorg=dfv['SOC'])
-            results['hist'][i] = round(value(prob_msc['objective']),2)
-            infeasibles['hist'][i] = '  '# if LpStatus[prob_msc.status] == 'Optimal' else ' x '
-
-        ### Evaluate performances
-        for model in models:
-            relativePerformances[model][i] = round(RelativePerformance(results[model][i], results['pf'][i], results['dc'][i]),2)
-            absolutePerformances[model][i] = round(AbsolutePerformance(results[model][i], results['dc'][i]),2)
-        relativePerformances['pf'][i] = -1*relativePerformances['pf'][i] # Reverse sign
+            ### Evaluate performances
+            for model in models:
+                relativePerformances[model][i] = round(RelativePerformance(results[model][i], results['pf'][i], results['dc'][i]),2)
+                absolutePerformances[model][i] = round(AbsolutePerformance(results[model][i], results['dc'][i]),2)
+            relativePerformances['pf'][i] = -1*relativePerformances['pf'][i] # Reverse sign
+    except:
+        print('\n\n\n\n\n\n\nError in vehicle '+str(vehicle_id)+'\n\n\n\n\n\n\n')
+        continue
         
     # Export results to file
     relativePerformances.to_csv('results/'+nowstring+'/relativePerformances.csv', index=False)

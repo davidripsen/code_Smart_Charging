@@ -578,7 +578,7 @@ for id in vehicles:
     print("Plotting vehicle", id)
     try:
         dfv = PlotChargingProfile(D2, id=id, df_only=True, plot_efficiency_and_SOCmin=False, vertical_hover=False)
-        if sum(dfv.use > 1) < 4: # Min 4 charge sessions
+        if (sum(dfv.use > 1) < 4) or len(dfv)<24*7*2: # Min 2 weeks of data and min. 4 charge sessions
             continue
         PlotChargingProfile(dfvehicle=dfv, id=id, plot_efficiency_and_SOCmin=False)
     except:
@@ -592,7 +592,6 @@ for id in vehicles:
 # Export list of vehicles
 with open('data/MPC-ready/df_TRAIN_RANDOM_vehicle_list.pkl', 'wb') as f:
     pickle.dump(DFV, f)
-# Random vehicles?
 
 
 
