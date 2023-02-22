@@ -18,11 +18,11 @@ path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
 # Specify
-folder = '22-02-2023__09h_13m_46s'
-manuel_title="Relative Total Cost of charging each random vehicle during test period"
-nameofplot = 'randomtestresultsGridSearchRTC'
-measure = 'relativePerformances'
-y_title = 'Relative Total Cost'
+folder = '21-02-2023__12h_44m_00s'
+manuel_title="Total Cost of charging each random vehicle during test period"
+nameofplot = 'randomtestresultsGridSearchTC'
+measure = 'results'
+y_title = 'DKK'
 
 # Read data
 D = pd.read_csv('results/'+folder+'/'+measure+'.csv')
@@ -63,11 +63,11 @@ fig.update_traces(boxmean=True)
 fig.update_layout(xaxis_title_text='Model', yaxis_title_text = y_title)
 if measure=='relativePerformances': fig.update_layout(yaxis_range=[-0.01, 1.01])
 #else: fig.update_layout(yaxis_range=[-5, 1.02*D.max()['dc']])
-fig.show()
-fig.write_html(pathhtml+nameofplot+'.html')
+#fig.show()
+#fig.write_html(pathhtml+nameofplot+'.html')
 fig.update_layout(layout)
 fig.update_traces(line_width=1, marker_size=2)
-fig.write_image(path+nameofplot+'.pdf')
+#fig.write_image(path+nameofplot+'.pdf')
 
 RESULTS = pd.DataFrame(columns=['model','mean', 'median', 'stdofmean'])
 for col in order:
