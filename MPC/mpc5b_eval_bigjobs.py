@@ -17,14 +17,18 @@ layout = dict(font=dict(family='Computer Modern',size=11),
 path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/Results/'
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
-folder = '21-02-2023__12h_44m_00s'
-measure = 'relativePerformances'
-manuel_title="Relative Total Cost of charging each vehicle during training period"
+# Specify
+folder = '21-02-2023__18h_38m_22s'
+measure = 'results'
+manuel_title="Total Cost of charging each same vehicle during test period"
+nameofplot = 'testresultsGridSearchTC'
+
+# Read data
 D = pd.read_csv('results/'+folder+'/'+measure+'.csv')
 D = D[D != ' - ']
 #D = D.dropna()
 D = D.astype(float)
-order = ['pf', 'da'] + [i for i in D.columns if i[:5]=='stoch'] + [i for i in D.columns if i[:3]=='mda'] + ['hist'] + ['dc']
+order = ['pf', 'da'] + [i for i in D.columns if i[:5]=='stoch'] + [i for i in D.columns if i[:3]=='mda'] + ['dc']
 
 # Read txt file Note
 with open('results/'+folder+'/NOTE.txt', 'r') as file:
@@ -52,20 +56,24 @@ for i, col in enumerate(order): #enumerate(D.columns):
 fig.update_layout(title_text=f'Boxplot of {measure} of the models ('+note+')', title_x=0.5, showlegend=False)
 if manuel_title: fig.update_layout(title_text=manuel_title)
 fig.update_traces(boxmean=True)
-fig.update_layout(xaxis_title_text='Model', yaxis_title_text = 'Relative Total Cost')
-fig.update_layout(yaxis_range=[0, 0.4])
+fig.update_layout(xaxis_title_text='Model', yaxis_title_text = 'DKK')
+if measure=='relativePerformances':fig.update_layout(yaxis_range=[0, 0.4])
 fig.show()
-fig.write_html(pathhtml+'resultsGridSearchRTC.html')
+fig.write_html(pathhtml+nameofplot+'.html')
 fig.update_layout(layout)
 fig.update_traces(line_width=1, marker_size=2)
-fig.write_image(path+'resultsGridSearchRTC.pdf')
+fig.write_image(path+nameofplot+'.pdf')
 
+RESULTS = pd.DataFrame(columns=['model','mean', 'median', 'stdofmean'])
+for col in order:
+        if col not in ['vehicle_id']:
+            RESULTS.loc[len(RESULTS)] = [col+'_'+note, D[col].mean(), D[col].median(), D[col].std()/np.sqrt(len(D))]
 
 
 # Repeat for only strictly feasible solutions
 fig = go.Figure()
-for i, col in enumerate(Dfeas.columns):
-    if col not in ['pf','dc','vehicle_id']:
+for i, col in enumerate(order):#enumerate(Dfeas.columns):
+    if col not in ['vehicle_id']:
         fig.add_trace(go.Box(y=Dfeas[col], name=col, boxpoints='all', jitter=0.3, pointpos=-1.8, marker_color=px.colors.qualitative.Plotly[i%10]))
 fig.update_layout(title_text='Boxplot of {measure} of the models (only strictly feasible solutions) ('+note+')', title_x=0.5)
 fig.update_traces(boxmean=True)
