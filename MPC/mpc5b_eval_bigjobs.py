@@ -19,9 +19,11 @@ pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCh
 
 # Specify
 folder = '21-02-2023__21h_47m_46s'
-measure = 'relativePerformances'
-manuel_title="Relative Total Cost of charging each new vehicle during test period"
-nameofplot = 'newtestresultsGridSearchRTC'
+measure = 'results'
+manuel_title="Total Cost of charging each new vehicle during test period"
+y_title = 'DKK'
+nameofplot = 'newtestresultsGridSearchTC'
+
 
 # Read data
 D = pd.read_csv('results/'+folder+'/'+measure+'.csv')
@@ -57,8 +59,9 @@ for i, col in enumerate(order): #enumerate(D.columns):
 fig.update_layout(title_text=f'Boxplot of {measure} of the models ('+note+')', title_x=0.5, showlegend=False)
 if manuel_title: fig.update_layout(title_text=manuel_title)
 fig.update_traces(boxmean=True)
-fig.update_layout(xaxis_title_text='Model', yaxis_title_text = 'Relative Total Cost')
-if measure=='relativePerformances':fig.update_layout(yaxis_range=[-0.01, 1.01])
+fig.update_layout(xaxis_title_text='Model', yaxis_title_text = y_title)
+if measure=='relativePerformances':fig.update_layout(yaxis_range=[-00.1, 1])
+fig.update_layout(yaxis_range=[-5, 1.02*D.max()['dc']])
 fig.show()
 fig.write_html(pathhtml+nameofplot+'.html')
 fig.update_layout(layout)
