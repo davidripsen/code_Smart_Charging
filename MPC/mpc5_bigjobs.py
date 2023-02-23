@@ -29,7 +29,7 @@ alpha = 0.3 # alpha=0.3 Shrinkage
 data = 'TEST_RANDOM_' # data='' for train,   "TEST_" for test, "TEST_NEW_" for new vehicles test set, "TEST_RANDOM_" for random vehicles test set
 
 
-NOTE =  f'{data}data - fixed c_tilde/c_tilde_DA' # Optional message to output folder
+NOTE =  f'Perfect: Use ({data}data)' # Optional message to output folder
 export_only = True # Open plot?
 runDeterministicReference = True
 print(NOTE)
@@ -54,7 +54,7 @@ AbsolutePerformance = lambda x, dc:       dc-x
 # Models
 models_h = ['stoch', 'mda'] #['stochKM', 'stoch', 'mda']
 models_plain = ['da', 'pf', 'dc'] # hist = historic charging using Montas Smart Charging
-horizons = [3]
+horizons = [3,6]
 models = models_plain + [models_h[i] + str(h) for i in range(len(models_h)) for h in horizons]
 
 # n_clusters  (= n_scenarios)
@@ -84,6 +84,8 @@ for i in range(len(DFV)):
         dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
                                                                                                                                                         uhat_var=f'use_org_rolling', bmin_var='SOCmin_everymorning',
                                                                                                                                                         p=p, data=data) # (dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',                                                                                                                                                                                                                   # uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
+        PerfectForesightUse=True
+
         if data != '':
             # If testing, use estimated c_tilde from grid search - avoid data leakage by NOT re-computing.
             c_tilde = 1.125219971
@@ -99,7 +101,7 @@ for i in range(len(DFV)):
 
         for h in horizons:
             # Stochastic (without kMediods)
-            prob_stoch, x, b, flagFeasible_stoch = MultiDayStochastic(scenarios, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, perfectForesight=False, maxh=6*24, KMweights=None)
+            prob_stoch, x, b, flagFeasible_stoch = MultiDayStochastic(scenarios, n_clusters, dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, perfectForesightUse=PerfectForesightUse, maxh=6*24, KMweights=None)
             results['stoch'+str(h)][i] = round(prob_stoch['objective'],2)
             infeasibles['stoch'+str(h)][i] = '  ' if flagFeasible_stoch else ' x '
             plot_EMPC(prob_stoch, 'Stochastic Smart Charge (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, BatteryCap=bmax, export_only=export_only, firsthour=firsthour, vehicle_id=vehicle_id)
@@ -114,7 +116,7 @@ for i in range(len(DFV)):
             if runDeterministicReference:
                 ### Multi-Dayahead (Deterministic)
                 # #h = 4*24 # 5 days horizon for the multi-day smart charge
-                prob_mda, x, b, flagFeasible_mda = MultiDay(dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesight=False)
+                prob_mda, x, b, flagFeasible_mda = MultiDay(dfp, dft, dfspot, u, uhat, z, h*24, b0, bmax, bmin, xmax, c_tilde, r, maxh = 6*24, perfectForesightUse=PerfectForesightUse)
                 results['mda'+str(h)][i] = round(prob_mda['objective'],2)
                 infeasibles['mda'+str(h)][i] = '  ' if flagFeasible_mda else ' x '
                 plot_EMPC(prob_mda, 'Multi-Day Smart Charge (h = '+str(h)+' days) of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
@@ -138,7 +140,7 @@ for i in range(len(DFV)):
             if data != '':
                 c_tilde_DA = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
                                                 uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=p_DA, data=data)[13]
-                prob_da, x, b, flagFeasible_da = MultiDay(dfp, dft, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde_DA, r, DayAhead=True, maxh=6*24, perfectForesight=False)
+                prob_da, x, b, flagFeasible_da = MultiDay(dfp, dft, dfspot, u, uhat, z, 0, b0, bmax, bmin, xmax, c_tilde_DA, r, DayAhead=True, maxh=6*24, perfectForesightUse=PerfectForesightUse)
             plot_EMPC(prob_da, 'Day-Ahead Smart Charge of vehicle = ' + str(vehicle_id), starttime=str(starttime.date()), endtime=str(endtime.date()), export=True, export_only=export_only, BatteryCap=bmax, firsthour=firsthour, vehicle_id=vehicle_id)
             results['da'][i] = round(prob_da['objective'],2)
             infeasibles['da'][i] = '  ' if flagFeasible_da else ' x '
