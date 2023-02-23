@@ -270,7 +270,7 @@ def getMediods(scenarios, n_clusters):
     return(mediods, cluster_proportions)
 
 # Maintained here
-def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesight=False, verbose=False):
+def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, KMweights=None, maxh=6*24, perfectForesightUse=False, verbose=False):
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1)
     H = h; # Store h
@@ -310,9 +310,6 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
 
             # Extract forecasts from t=0..h
             c_forecast = dfp.iloc[i, (j+3):(3+H+1)].to_numpy();
-            if perfectForesight:
-                #c_forecast = dft.iloc[i, (j+3):(3+H+1)].to_numpy();
-                c_forecast = c[k:k+h+1]
                 
             # Patch holes in forecasts (2 out of 2) - use known prices
             #c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(3+H+1)].to_numpy()[:min(l,h+1)]
@@ -347,7 +344,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
             bmin_i = bmin[np.append(tvec_i, tvec_i[-1]+1)]
 
             u_forecast = np.repeat(uhat[k], h+1)
-            if perfectForesight:
+            if perfectForesightUse:
                 u_forecast = u[tvec_i]
             u_t_true = u[k]
 
@@ -391,7 +388,7 @@ def MultiDayStochastic(scenarios, n_scenarios, dfp, dft, dfspot, u, uhat, z, h, 
                 return(prob, X, B, flag_AllFeasible)
 
 # Maintained here (from mpc3_montadata.py)
-def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=False, maxh=6*24, perfectForesight=False):
+def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, DayAhead=False, maxh=6*24, perfectForesightUse=False):
     # Study from first hour of prediciton up to and including the latest hour of known spot price
     L = len(u) - (maxh+1) # Run through all data, but we don't have forecasts of use/plug-in yet.
                         # maxh = maximum h of interest ==> to allow comparison on exact same data for different horizons h.
@@ -437,9 +434,6 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
             # Extract forecasts from t=0..h
             #c_forecast = dfp.iloc[i, (j+3):(j+3+h+1)].to_numpy()
             c_forecast = dfp.iloc[i, (j+3):(3+H+1)].to_numpy()
-            if perfectForesight:
-                #c_forecast = dft.iloc[i, (j+3):(3+H+1)].to_numpy();
-                c_forecast = c[k:k+h+1]
                 
             # Patch holes in forecasts (2 out of 2) - use known prices
             #c_forecast[:min(l,h+1)] = dft.iloc[i, (j+3):(3+H+1)].to_numpy()[:min(l,h+1)]
@@ -458,7 +452,7 @@ def MultiDay(dfp, dft, dfspot, u, uhat, z, h, b0, bmax, bmin, xmax, c_tilde, r, 
             bmin_i = bmin[np.append(tvec_i, tvec_i[-1]+1)]
 
             u_forecast = np.repeat(uhat[k], h+1) # = actually uhat[k-1], but a 0 has been appended as first value.
-            if perfectForesight:
+            if perfectForesightUse:
                 u_forecast = u[tvec_i]
             u_t_true = u[k]
             
