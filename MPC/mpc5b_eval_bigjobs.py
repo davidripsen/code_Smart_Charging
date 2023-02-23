@@ -19,7 +19,7 @@ pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCh
 
 # Specify
 folder = '23-02-2023__12h_26m_42s'
-manuel_title="Relative Total Cost of charging each random vehicle during test period"
+manuel_title= "Relative Total Cost of charging each random vehicle during test period"
 nameofplot = 'randomtestresultsRTC'
 measure = 'relativePerformances'
 y_title = 'Relative Total Cost'
@@ -115,4 +115,4 @@ fig.update_layout(layout)
 fig.write_image(path+'infeasibles.pdf')
 fig.show()
 
-(I.da== 1).mean()
+(I.mda3== 1).mean()
