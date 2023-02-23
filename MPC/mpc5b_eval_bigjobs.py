@@ -19,8 +19,8 @@ pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCh
 
 # Specify
 folder = '23-02-2023__12h_26m_42s'
-manuel_title="Relative Total Cost of charging each same vehicle during test period"
-nameofplot = 'testresultsGridSearchRTC'
+manuel_title="Relative Total Cost of charging each random vehicle during test period"
+nameofplot = 'randomtestresultsRTC'
 measure = 'relativePerformances'
 y_title = 'Relative Total Cost'
 
@@ -61,10 +61,10 @@ fig.update_layout(xaxis_title_text='Model', yaxis_title_text = y_title)
 if measure=='relativePerformances': fig.update_layout(yaxis_range=[-0.01, 1.01])
 #else: fig.update_layout(yaxis_range=[-5, 1.02*D.max()['dc']])
 fig.show()
-#fig.write_html(pathhtml+nameofplot+'.html')
+fig.write_html(pathhtml+nameofplot+'.html')
 fig.update_layout(layout)
 fig.update_traces(line_width=1, marker_size=2)
-#fig.write_image(path+nameofplot+'.pdf')
+fig.write_image(path+nameofplot+'.pdf')
 
 RESULTS = pd.DataFrame(columns=['model','mean', 'median', 'stdofmean'])
 for col in order:
@@ -104,7 +104,7 @@ fig.show()
 ### Visualise the heatmap of I == 1' x '
 I = I.replace(' x ', 1)
     # Move stoch4 and mda4 to the second and third column
-I = I[['da','stoch3', 'stoch4', 'stoch5', 'stoch6', 'mda3','mda4','mda5','mda6',  'pf','dc']]          # <----- adjust this bad boy to the models
+I = I[['da','stoch3', 'mda3','pf','dc']]          # <----- adjust this bad boy to the models
 fig = go.Figure(data=go.Heatmap(z=I, x=I.columns, y=I.index))
 fig.update_layout(title_text='Heatmap of infeasible charge plans', title_x=0.5)
 # Add xtext = 'Vehicle'

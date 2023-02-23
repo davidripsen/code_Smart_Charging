@@ -84,8 +84,7 @@ for i in range(len(DFV)):
         dfv, dfspot, dfp, dft, timestamps, z, u, uhat, b0, r, bmin, bmax, xmax, c_tilde, vehicle_id, firsthour, starttime, endtime = ExtractEVdataForMPC(dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',
                                                                                                                                                         uhat_var=f'use_org_rolling', bmin_var='SOCmin_everymorning',
                                                                                                                                                         p=p, data=data) # (dfv=DFV[i], z_var='z_plan_everynight', u_var='use_lin',                                                                                                                                                                                                                   # uhat_var='use_org_rolling', bmin_var='SOCmin_everymorning', p=0.10)
-        PerfectForesightUse=True
-
+        PerfectForesightUse=False
         if data != '':
             # If testing, use estimated c_tilde from grid search - avoid data leakage by NOT re-computing.
             c_tilde = 1.125219971
