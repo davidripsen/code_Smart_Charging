@@ -4,7 +4,7 @@ In this repository you will find all the code and models for the Masters Thesis 
 Checkout [visualisations](https://davidripsen.github.io/code_Smart_Charging/) to see some of the results.
 
 ## Code
-The most important implementations is located in the `MPC/`-folder, particularly `MPC/FunctionCollection.py`.
+The most important implementations is located in `MPC/`, particularly `MPC/FunctionCollection.py`.
 
 ## Figures
 [1](https://davidripsen.github.io/code_Smart_Charging/_figures/spotprices)
