@@ -18,9 +18,9 @@ path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
 # Specify
-folder = '23-02-2023__12h_26m_42s'
-manuel_title= "Relative Total Cost of charging each random vehicle during test period"
-nameofplot = 'randomtestresultsRTC'
+folder = '23-02-2023__13h_42m_09s' # TEST RANDOM vehicles: 23-02-2023__12h_26m_42s
+manuel_title= 'Relative Total Cost - perfect forecasts: Price' #"Total Cost of charging each random vehicle during test period"
+nameofplot = 'perfectPriceRTC'
 measure = 'relativePerformances'
 y_title = 'Relative Total Cost'
 
@@ -112,7 +112,120 @@ fig.update_traces(showscale=False)
 fig.update_layout(xaxis_title_text='Model', yaxis_title_text='Vehicle')
 fig.write_html(pathhtml+'infeasibles.html')
 fig.update_layout(layout)
-fig.write_image(path+'infeasibles.pdf')
+#fig.write_image(path+'infeasibles.pdf')
 fig.show()
 
 (I.mda3== 1).mean()
+
+
+
+# Expected Value of Intelligence
+days = {6151: 28,
+ 14769: 54,
+ 8574: 34,
+ 20235: 38,
+ 31613: 54,
+ 37097: 54,
+ 5821: 54,
+ 28916: 54,
+ 2549: 54,
+ 11245: 18,
+ 15373: 47,
+ 6391: 54,
+ 9843: 23,
+ 25783: 54,
+ 22223: 54,
+ 4827: 35,
+ 20039: 45,
+ 1604: 54,
+ 2355: 54,
+ 7640: 31,
+ 21993: 54,
+ 19595: 54,
+ 7932: 38,
+ 31393: 43,
+ 32793: 54,
+ 14268: 54,
+ 4399: 54,
+ 10444: 54,
+ 11176: 54,
+ 29167: 54,
+ 14739: 54,
+ 39681: 28,
+ 7885: 47,
+ 15602: 54,
+ 13537: 54,
+ 38755: 54,
+ 39248: 54,
+ 6614: 54,
+ 31039: 54,
+ 22260: 54,
+ 8580: 54,
+ 31497: 54,
+ 1975: 42,
+ 17806: 54,
+ 15160: 38,
+ 18349: 36,
+ 15406: 28,
+ 31060: 54,
+ 27502: 42,
+ 37830: 54,
+ 22635: 27,
+ 34845: 38,
+ 29174: 52,
+ 3848: 52,
+ 21019: 54,
+ 36297: 54,
+ 18749: 54,
+ 31920: 54,
+ 32114: 54,
+ 12581: 54,
+ 21047: 38,
+ 28066: 54,
+ 15859: 54,
+ 38388: 54,
+ 30762: 54,
+ 10361: 54,
+ 16718: 54,
+ 13440: 54,
+ 26305: 54,
+ 28405: 50,
+ 34259: 54,
+ 41558: 53,
+ 14236: 54,
+ 21097: 54,
+ 6768: 54,
+ 6131: 54,
+ 22: 54,
+ 10437: 54,
+ 9885: 32,
+ 5925: 31,
+ 36401: 26,
+ 34687: 54,
+ 1592: 54,
+ 1943: 24,
+ 19336: 54,
+ 38379: 54,
+ 28568: 54,
+ 13105: 54,
+ 30847: 54,
+ 35666: 54,
+ 25701: 54,
+ 34579: 54,
+ 18892: 54,
+ 14171: 54,
+ 6861: 54,
+ 13522: 54,
+ 12802: 54,
+ 10204: 54,
+ 19093: 54,
+ 30143: 31}
+
+# dict to array
+days_arr = np.array(list(days.values()))
+
+# Saving
+save = np.nanmean(((D['dc'] - D['da']).values / days_arr)) * 365
+
+#
+save / (np.nanmean(((D['dc']).values / days_arr)) * 365)
