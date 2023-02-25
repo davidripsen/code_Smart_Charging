@@ -18,10 +18,10 @@ path = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge
 pathhtml = '/Users/davidipsen/Documents/DTU/5. Semester (MSc)/Thesis  -  SmartCharge/plots/_figures/'
 
 # Specify
-folder = '23-02-2023__13h_42m_09s' # TEST RANDOM vehicles: 23-02-2023__12h_26m_42s
-manuel_title= 'Relative Total Cost - perfect forecasts: Price' #"Total Cost of charging each random vehicle during test period"
-nameofplot = 'perfectPriceRTC'
-measure = 'relativePerformances'
+folder = '22-02-2023__09h_13m_46s' # TEST RANDOM vehicles: 23-02-2023__12h_26m_42s
+manuel_title= 'Relative Total Cost - perfect forecasts: Price and Usage' #"Total Cost of charging each random vehicle during test period"
+nameofplot = 'perfectPriceUseRTC'
+measure = 'results'
 y_title = 'Relative Total Cost'
 
 # Read data
@@ -61,10 +61,10 @@ fig.update_layout(xaxis_title_text='Model', yaxis_title_text = y_title)
 if measure=='relativePerformances': fig.update_layout(yaxis_range=[-0.01, 1.01])
 #else: fig.update_layout(yaxis_range=[-5, 1.02*D.max()['dc']])
 fig.show()
-fig.write_html(pathhtml+nameofplot+'.html')
+#fig.write_html(pathhtml+nameofplot+'.html')
 fig.update_layout(layout)
 fig.update_traces(line_width=1, marker_size=2)
-fig.write_image(path+nameofplot+'.pdf')
+#fig.write_image(path+nameofplot+'.pdf')
 
 RESULTS = pd.DataFrame(columns=['model','mean', 'median', 'stdofmean'])
 for col in order:
@@ -83,12 +83,13 @@ fig.show()
 
 # Calculate two-sample PAIRED t-test for each model pair and write nicely in an pandas dataframe
 ttest = pd.DataFrame(columns=['model1','model2','t-statistic','p-value'])
-for i, col1 in enumerate(Dres.columns):
+D = D.dropna()
+for i, col1 in enumerate(D.columns):
     if col1 not in ['vehicle_id']:
-        for j, col2 in enumerate(Dres.columns):
+        for j, col2 in enumerate(D.columns):
             if col2 not in ['vehicle_id']:
                 if i<j:
-                    ttest.loc[len(ttest)] = [col1, col2, stats.ttest_rel(Dres[col1], Dres[col2])[0], stats.ttest_rel(Dres[col1], Dres[col2])[1]]
+                    ttest.loc[len(ttest)] = [col1, col2, stats.ttest_rel(D[col1], D[col2])[0], stats.ttest_rel(D[col1], D[col2])[1]]
 round(ttest,3)
 
 # Make histogram of the values from each model using plotly. Give them distinct colors.
@@ -227,5 +228,142 @@ days_arr = np.array(list(days.values()))
 # Saving
 save = np.nanmean(((D['dc'] - D['da']).values / days_arr)) * 365
 
-#
+# percentage of saving
 save / (np.nanmean(((D['dc']).values / days_arr)) * 365)
+
+
+######### Expected Value of Inteligence  - DA vs Monta
+# Remove rows in D by index
+ind = [39, 36, 96]
+veh_ind = D.vehicle_id[ind]
+D = D.drop(ind)
+
+days_TRAIN_RANDOM = {21217: 49,
+ 23715: 44,
+ 9307: 46,
+ 9004: 15,
+ 9234: 25,
+ 5418: 48,
+ 27245: 50,
+ 28354: 49,
+ 22069: 30,
+ 28710: 50,
+ 853: 50,
+ 6491: 46,
+ 14911: 43,
+ 32278: 40,
+ 13757: 50,
+ 11971: 26,
+ 3871: 24,
+ 25086: 50,
+ 17751: 48,
+ 29047: 50,
+ 15374: 25,
+ 30847: 50,
+ 23849: 49,
+ 9298: 27,
+ 23354: 49,
+ 34773: 31,
+ 24799: 50,
+ 33996: 29,
+ 17551: 47,
+ 9911: 50,
+ 22663: 44,
+ 10609: 48,
+ 4703: 27,
+ 1907: 43,
+ 19234: 50,
+ 9614: 43,
+ 5414: 49,
+ 24041: 48,
+ 4441: 42,
+ 28488: 48,
+ 6768: 47,
+ 11914: 49,
+ 1879: 48,
+ 7336: 50,
+ 33757: 33,
+ 32012: 42,
+ 10985: 22,
+ 1601: 48,
+ 22187: 49,
+ 21121: 43,
+ 23003: 33,
+ 22683: 48,
+ 19674: 47,
+ 11124: 48,
+ 4633: 43,
+ 34328: 19,
+ 16709: 50,
+ 34687: 21,
+ 22872: 45,
+ 33570: 34,
+ 28858: 27,
+ 29578: 46,
+ 7668: 25,
+ 2549: 50,
+ 20629: 18,
+ 6739: 49,
+ 24230: 47,
+ 11921: 45,
+ 28413: 49,
+ 837: 48,
+ 26592: 45,
+ 34899: 16,
+ 6093: 50,
+ 17406: 48,
+ 19275: 50,
+ 35969: 23,
+ 12581: 48,
+ 34971: 30,
+ 14617: 49,
+ 12486: 49,
+ 16614: 49,
+ 26787: 50,
+ 4167: 48,
+ 13729: 49,
+ 21936: 50,
+ 31613: 50,
+ 22995: 49,
+ 25648: 50,
+ 33922: 36,
+ 12141: 46,
+ 11847: 46,
+ 15153: 35,
+ 25134: 21,
+ 33756: 22,
+ 6199: 42,
+ 34510: 19,
+ 5930: 49,
+ 6696: 49,
+ 24696: 48,
+ 31117: 50}
+
+# Savings
+saves = []
+nonsaves = []
+for veh in D.vehicle_id:
+    i = D[D.vehicle_id == veh].index[0]
+    saves.append( ((D['hist'][i] - D['da'][i])/days_TRAIN_RANDOM[veh])*365)
+    nonsaves.append( (D['hist'][i]/days_TRAIN_RANDOM[veh])*365)
+averagesaves = np.mean(saves)
+print(averagesaves)
+
+# Savings percentage
+print(averagesaves / np.mean(nonsaves))
+
+
+
+# Estimate on test set
+RTC=0.695670
+PF = D.mean()['pf']
+DC = D.mean()['dc']
+DA = D.mean()['da']
+
+zHIST = -1* (RTC*(PF-DC)-PF)
+
+# Savings
+((zHIST - DA) /  np.mean(np.array(list(days.values()))))   * 365
+
+# Savings percentage
+(((zHIST - DA) /  np.mean(np.array(list(days.values()))))   * 365) / ((zHIST /  np.mean(np.array(list(days.values()))))   * 365)
